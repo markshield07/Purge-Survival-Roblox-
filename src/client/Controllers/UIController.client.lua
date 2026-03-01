@@ -1,8 +1,8 @@
 --[[
 	UIController.client.lua
 	Client-side HUD and UI management.
-	Displays: Hunger bar, Power meter, Inventory, Purge countdown,
-	Mini-map, Crafting menu, and all game state indicators.
+	Displays: Health, Hunger, Stamina, Equipped Weapon, Backpack Inventory,
+	Power meter, Purge countdown, and all game state indicators.
 ]]
 
 local Players = game:GetService("Players")
@@ -30,6 +30,7 @@ local PurgeEnded = Remotes:WaitForChild("PurgeEnded")
 local DayChanged = Remotes:WaitForChild("DayChanged")
 local NotifyPlayers = Remotes:WaitForChild("NotifyPlayers")
 local PowerOutAlert = Remotes:WaitForChild("PowerOutAlert")
+local EquipItem = Remotes:WaitForChild("EquipItem")
 
 ------------------------------------------------------------------------
 -- Create Main HUD ScreenGui
@@ -165,14 +166,6 @@ local HungerContainer, HungerFill, HungerLabel = CreateBar({
 	Parent = HUD,
 })
 
-local HungerIcon = CreateLabel({
-	Name = "HungerIcon",
-	Size = UDim2.new(0, 20, 0, 20),
-	Position = UDim2.new(0, -22, 0, 88),
-	Text = "",
-	Parent = HUD,
-})
-
 ------------------------------------------------------------------------
 -- Stamina Bar
 ------------------------------------------------------------------------
@@ -184,6 +177,80 @@ local StaminaContainer, StaminaFill, StaminaLabel = CreateBar({
 	LabelText = "Stamina",
 	Parent = HUD,
 })
+
+------------------------------------------------------------------------
+-- Equipped Weapon Display (below stamina bar)
+------------------------------------------------------------------------
+local WeaponFrame = CreateFrame({
+	Name = "EquippedWeapon",
+	Size = UDim2.new(0, 220, 0, 36),
+	Position = UDim2.new(0, 15, 0, 140),
+	BackgroundTransparency = 0.4,
+	Corner = 6,
+})
+
+local WeaponIcon = CreateLabel({
+	Name = "Icon",
+	Size = UDim2.new(0, 28, 0, 28),
+	Position = UDim2.new(0, 4, 0, 4),
+	Text = "",
+	TextColor3 = Color3.fromRGB(200, 200, 200),
+	Font = Enum.Font.GothamBold,
+	Parent = WeaponFrame,
+})
+
+local WeaponNameLabel = CreateLabel({
+	Name = "WeaponName",
+	Size = UDim2.new(1, -40, 0, 18),
+	Position = UDim2.new(0, 36, 0, 2),
+	Text = "Baseball Bat",
+	TextColor3 = Color3.fromRGB(100, 200, 255),
+	TextXAlignment = Enum.TextXAlignment.Left,
+	Font = Enum.Font.GothamBold,
+	Parent = WeaponFrame,
+})
+
+local WeaponDmgLabel = CreateLabel({
+	Name = "WeaponDmg",
+	Size = UDim2.new(1, -40, 0, 14),
+	Position = UDim2.new(0, 36, 0, 20),
+	Text = "DMG: 18 | Melee",
+	TextColor3 = Color3.fromRGB(180, 180, 180),
+	TextXAlignment = Enum.TextXAlignment.Left,
+	Font = Enum.Font.Gotham,
+	Parent = WeaponFrame,
+})
+
+local function UpdateEquippedWeaponDisplay(weaponId)
+	if not weaponId then
+		WeaponNameLabel.Text = "No weapon"
+		WeaponDmgLabel.Text = "Unarmed"
+		WeaponNameLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+		return
+	end
+
+	local itemData = ItemDatabase.GetItem(weaponId)
+	if not itemData then
+		WeaponNameLabel.Text = weaponId
+		WeaponDmgLabel.Text = ""
+		return
+	end
+
+	local tierColor = Enums.TierColor[itemData.tier] or Color3.new(1, 1, 1)
+	WeaponNameLabel.Text = itemData.name
+	WeaponNameLabel.TextColor3 = tierColor
+
+	local dmgText = "DMG: " .. (itemData.damage or "?")
+	if itemData.weaponType == "Melee" then
+		dmgText = dmgText .. " | Melee"
+	elseif itemData.weaponType == "Ranged" then
+		dmgText = dmgText .. " | Range: " .. (itemData.range or "?")
+	end
+	WeaponDmgLabel.Text = dmgText
+end
+
+-- Show default equipped weapon
+UpdateEquippedWeaponDisplay("baseball_bat")
 
 ------------------------------------------------------------------------
 -- Power Meter (bottom-right)
@@ -310,39 +377,62 @@ local function ShowNotification(text: string, color: Color3?)
 end
 
 ------------------------------------------------------------------------
--- Inventory Display (bottom-center)
+-- Inventory Display (bottom-center) — Dynamic slots based on maxSlots
 ------------------------------------------------------------------------
+local currentMaxSlots = Config.Player.MaxInventorySlots  -- starts at 5
+
 local InventoryFrame = CreateFrame({
 	Name = "InventoryBar",
-	Size = UDim2.new(0, 600, 0, 60),
-	Position = UDim2.new(0.5, 0, 1, -15),
+	Size = UDim2.new(0, 600, 0, 75),
+	Position = UDim2.new(0.5, 0, 1, -10),
 	AnchorPoint = Vector2.new(0.5, 1),
 	BackgroundTransparency = 0.5,
 	Corner = 8,
+})
+
+-- Backpack capacity label above inventory
+local BackpackLabel = CreateLabel({
+	Name = "BackpackLabel",
+	Size = UDim2.new(1, 0, 0, 14),
+	Position = UDim2.new(0, 0, 0, 1),
+	Text = "Backpack [0/" .. currentMaxSlots .. "]",
+	TextColor3 = Color3.fromRGB(180, 200, 180),
+	Font = Enum.Font.Gotham,
+	Parent = InventoryFrame,
+})
+
+local InventorySlotContainer = CreateFrame({
+	Name = "SlotContainer",
+	Size = UDim2.new(1, -8, 0, 52),
+	Position = UDim2.new(0, 4, 0, 17),
+	BackgroundTransparency = 1,
+	Parent = InventoryFrame,
 })
 
 local InventoryLayout = Instance.new("UIListLayout")
 InventoryLayout.FillDirection = Enum.FillDirection.Horizontal
 InventoryLayout.SortOrder = Enum.SortOrder.LayoutOrder
 InventoryLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-InventoryLayout.Padding = UDim.new(0, 4)
-InventoryLayout.Parent = InventoryFrame
+InventoryLayout.Padding = UDim.new(0, 3)
+InventoryLayout.Parent = InventorySlotContainer
 
--- Create inventory slots
 local InventorySlots = {}
-for i = 1, Config.Player.MaxInventorySlots do
+
+local function CreateInventorySlot(index)
+	local slotWidth = math.min(50, math.floor(580 / currentMaxSlots) - 4)
 	local slot = CreateFrame({
-		Name = "Slot_" .. i,
-		Size = UDim2.new(0, 36, 0, 50),
+		Name = "Slot_" .. index,
+		Size = UDim2.new(0, slotWidth, 0, 50),
 		BackgroundColor3 = Color3.fromRGB(40, 40, 40),
 		BackgroundTransparency = 0.3,
-		Parent = InventoryFrame,
+		Parent = InventorySlotContainer,
 		Corner = 4,
 	})
 
 	local nameLabel = CreateLabel({
 		Name = "ItemName",
-		Size = UDim2.new(1, 0, 0.6, 0),
+		Size = UDim2.new(1, -2, 0.6, 0),
+		Position = UDim2.new(0, 1, 0, 0),
 		Text = "",
 		TextColor3 = Color3.new(1, 1, 1),
 		Font = Enum.Font.Gotham,
@@ -351,27 +441,59 @@ for i = 1, Config.Player.MaxInventorySlots do
 
 	local countLabel = CreateLabel({
 		Name = "Count",
-		Size = UDim2.new(1, 0, 0.3, 0),
-		Position = UDim2.new(0, 0, 0.7, 0),
+		Size = UDim2.new(1, -2, 0.3, 0),
+		Position = UDim2.new(0, 1, 0.7, 0),
 		Text = "",
 		TextColor3 = Color3.fromRGB(200, 200, 200),
 		Font = Enum.Font.Gotham,
 		Parent = slot,
 	})
 
-	InventorySlots[i] = {
+	return {
 		frame = slot,
 		nameLabel = nameLabel,
 		countLabel = countLabel,
 	}
 end
 
+local function RebuildInventorySlots(maxSlots)
+	-- Clear existing slots
+	for _, slotData in ipairs(InventorySlots) do
+		slotData.frame:Destroy()
+	end
+	InventorySlots = {}
+
+	currentMaxSlots = maxSlots
+
+	for i = 1, maxSlots do
+		InventorySlots[i] = CreateInventorySlot(i)
+	end
+
+	BackpackLabel.Text = "Backpack [0/" .. maxSlots .. "]"
+end
+
+-- Initialize with default slot count
+RebuildInventorySlots(currentMaxSlots)
+
 local function UpdateInventoryDisplay(inventory)
+	local filledCount = inventory and #inventory or 0
+	BackpackLabel.Text = "Backpack [" .. filledCount .. "/" .. currentMaxSlots .. "]"
+
+	-- Color the label based on capacity
+	if filledCount >= currentMaxSlots then
+		BackpackLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+	elseif filledCount >= currentMaxSlots * 0.8 then
+		BackpackLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+	else
+		BackpackLabel.TextColor3 = Color3.fromRGB(180, 200, 180)
+	end
+
 	for i, slot in ipairs(InventorySlots) do
 		local item = inventory and inventory[i] or nil
 		if item then
 			local itemData = ItemDatabase.GetItem(item.itemId)
-			slot.nameLabel.Text = itemData and string.sub(itemData.name, 1, 6) or "?"
+			local charLimit = currentMaxSlots > 10 and 5 or 6
+			slot.nameLabel.Text = itemData and string.sub(itemData.name, 1, charLimit) or "?"
 			slot.countLabel.Text = item.quantity > 1 and ("x" .. item.quantity) or ""
 
 			local tierColor = itemData and Enums.TierColor[itemData.tier] or Color3.new(1, 1, 1)
@@ -425,7 +547,7 @@ local PurgeCoinsLabel = CreateLabel({
 local BuffFrame = CreateFrame({
 	Name = "Buffs",
 	Size = UDim2.new(0, 200, 0, 25),
-	Position = UDim2.new(0, 15, 0, 138),
+	Position = UDim2.new(0, 15, 0, 182),
 	BackgroundTransparency = 1,
 })
 
@@ -498,6 +620,18 @@ UpdateHUD.OnClientEvent:Connect(function(updateType, data)
 	elseif updateType == "InventoryUpdate" then
 		UpdateInventoryDisplay(data)
 
+	elseif updateType == "EquippedWeapon" then
+		UpdateEquippedWeaponDisplay(data)
+
+	elseif updateType == "BackpackUpgrade" then
+		-- data = new max slots
+		RebuildInventorySlots(data)
+		ShowNotification("Backpack upgraded! " .. data .. " slots now available.", Color3.fromRGB(50, 255, 100))
+
+	elseif updateType == "BaseLevel" then
+		local levelNames = { "Starter", "Expanded", "Reinforced", "Fortified" }
+		ShowNotification("Base Level: " .. (levelNames[data] or data), Color3.fromRGB(0, 255, 100))
+
 	elseif updateType == "PurgeStatus" then
 		if data.purgeActive then
 			PurgeFrame.Visible = true
@@ -539,7 +673,6 @@ UpdateHUD.OnClientEvent:Connect(function(updateType, data)
 		end)
 
 	elseif updateType == "GeneratorFlicker" then
-		-- Brief screen darken
 		if data then
 			HUD.BackgroundTransparency = 0.8
 		else

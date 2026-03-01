@@ -142,6 +142,7 @@ Enums.ItemCategory = {
 	Recipe = "Recipe",
 	Cosmetic = "Cosmetic",
 	Ammo = "Ammo",
+	Backpack = "Backpack",
 }
 
 -- Hunger levels
@@ -289,10 +290,38 @@ Config.Player = {
 	BaseSprintSpeed = 24,
 	DownedCrawlSpeed = 4,
 	ReviveTimeSeconds = 5,
-	MaxInventorySlots = 15,
-	MaxInventorySlotsVIP = 20,
+	MaxInventorySlots = 5,      -- default backpack holds 5 items
+	MaxInventorySlotsVIP = 8,   -- VIP gets a slightly bigger starter pack
 	InteractRange = 8,
 	PickupRange = 6,
+}
+
+-- Backpack capacity tiers (found as loot to upgrade inventory size)
+Config.Backpack = {
+	Default = 5,            -- starter sack
+	SmallBackpack = 10,
+	MediumBackpack = 15,
+	LargeBackpack = 20,
+}
+
+-- Base expansion: costs and dimensions per level
+Config.BaseExpansion = {
+	MaxLevel = 4,
+	Dimensions = {
+		-- { width, depth, height }
+		[1] = { 28, 22, 10 },  -- starter
+		[2] = { 34, 26, 11 },  -- first expansion
+		[3] = { 40, 30, 12 },  -- second expansion
+		[4] = { 48, 36, 14 },  -- full mansion
+	},
+	Costs = {
+		-- level 1 → 2
+		[2] = { plywood = 5, nails = 10, wooden_planks = 3 },
+		-- level 2 → 3
+		[3] = { reinforced_boards = 5, steel_nails = 5, sandbags = 3 },
+		-- level 3 → 4
+		[4] = { steel_panels = 3, industrial_lock = 2, steel_door = 1 },
+	},
 }
 
 ------------------------------------------------------------------------
@@ -1436,6 +1465,40 @@ ItemDatabase.Items = {
 	},
 
 	------------------------------------------------------------------------
+	-- Backpacks (upgrade inventory capacity)
+	------------------------------------------------------------------------
+	small_backpack = {
+		name = "Small Backpack",
+		category = Cat.Backpack,
+		tier = Tier.Uncommon,
+		description = "A durable school backpack. Holds 10 items.",
+		stackable = false,
+		maxStack = 1,
+		weight = 2,
+		backpackSlots = 10,
+	},
+	medium_backpack = {
+		name = "Hiking Backpack",
+		category = Cat.Backpack,
+		tier = Tier.Rare,
+		description = "Sturdy hiking backpack with multiple compartments. Holds 15 items.",
+		stackable = false,
+		maxStack = 1,
+		weight = 3,
+		backpackSlots = 15,
+	},
+	large_backpack = {
+		name = "Military Rucksack",
+		category = Cat.Backpack,
+		tier = Tier.Epic,
+		description = "Heavy-duty military rucksack. Holds 20 items.",
+		stackable = false,
+		maxStack = 1,
+		weight = 4,
+		backpackSlots = 20,
+	},
+
+	------------------------------------------------------------------------
 	-- Recipe Cards
 	------------------------------------------------------------------------
 	recipe_heated_beans = {
@@ -1521,6 +1584,7 @@ ItemDatabase.ZoneLoot = {
 		"spark_plugs", "wiring", "fan_belt",
 		"stove_parts", "recipe_roasted_rabbit", "recipe_fish_tacos",
 		"tomato_seed", "potato_seed",
+		"small_backpack",
 	},
 	[3] = {
 		"steel_panels", "bulletproof_glass", "industrial_lock", "steel_door",
@@ -1531,6 +1595,7 @@ ItemDatabase.ZoneLoot = {
 		"glow_stick",
 		"industrial_motor", "voltage_regulator", "heavy_fuel_tank", "solar_panel",
 		"kitchen_parts", "recipe_venison_stew", "recipe_power_meal",
+		"medium_backpack", "large_backpack",
 	},
 }
 
@@ -2491,6 +2556,30 @@ ItemVisuals.Items = {
 	},
 
 	------------------------------------------------------------------------
+	-- BACKPACKS
+	------------------------------------------------------------------------
+	small_backpack = {
+		shape = BLOCK,
+		size = Vector3.new(0.9, 1.0, 0.5),
+		color = Color3.fromRGB(60, 100, 60),
+		material = Enum.Material.Fabric,
+	},
+	medium_backpack = {
+		shape = BLOCK,
+		size = Vector3.new(1.0, 1.2, 0.6),
+		color = Color3.fromRGB(80, 60, 40),
+		material = Enum.Material.Fabric,
+		glow = Color3.fromRGB(0, 120, 255),
+	},
+	large_backpack = {
+		shape = BLOCK,
+		size = Vector3.new(1.1, 1.4, 0.7),
+		color = Color3.fromRGB(50, 60, 50),
+		material = Enum.Material.Fabric,
+		glow = Color3.fromRGB(180, 0, 255),
+	},
+
+	------------------------------------------------------------------------
 	-- SEEDS
 	------------------------------------------------------------------------
 	tomato_seed = {
@@ -2653,6 +2742,12 @@ ItemVisuals.CategoryDefaults = {
 		color = Color3.fromRGB(220, 210, 180),
 		material = Enum.Material.SmoothPlastic,
 	},
+	Backpack = {
+		shape = BLOCK,
+		size = Vector3.new(0.9, 1.0, 0.5),
+		color = Color3.fromRGB(70, 90, 60),
+		material = Enum.Material.Fabric,
+	},
 }
 
 ------------------------------------------------------------------------
@@ -2782,13 +2877,23 @@ return ItemVisuals
             <string name="Name">InteractRequest</string>
           </Properties>
         </Item>
+        <Item class="RemoteEvent" referent="RBX0000002A">
+          <Properties>
+            <string name="Name">EquipItem</string>
+          </Properties>
+        </Item>
+        <Item class="RemoteEvent" referent="RBX0000002B">
+          <Properties>
+            <string name="Name">UpgradeBase</string>
+          </Properties>
+        </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="RBX0000002A">
+  <Item class="ServerScriptService" referent="RBX0000002C">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="RBX0000002B">
+    <Item class="Script" referent="RBX0000002D">
       <Properties>
         <string name="Name">GameManager</string>
         <ProtectedString name="Source">--[[
@@ -2844,6 +2949,8 @@ local FortifyRequest = CreateRemote("FortifyRequest", "RemoteEvent")
 local RefuelRequest = CreateRemote("RefuelRequest", "RemoteEvent")
 local ReviveRequest = CreateRemote("ReviveRequest", "RemoteEvent")
 local CraftRequest = CreateRemote("CraftRequest", "RemoteEvent")
+local EquipItem = CreateRemote("EquipItem", "RemoteEvent")
+local UpgradeBase = CreateRemote("UpgradeBase", "RemoteEvent")
 
 -- Data remotes
 local RequestInventory = CreateRemote("RequestInventory", "RemoteFunction")
@@ -2868,6 +2975,7 @@ local GameState = {
 		fortifications = {},  -- [slotName] = { materialId, durability, maxDurability }
 		cookingStations = {},  -- [stationType] = true/false
 		gardenPlots = {},     -- { seedId, plantedDay, grown }
+		baseLevel = 1,        -- expansion level (1-4)
 	},
 
 	-- Generator state
@@ -2901,7 +3009,8 @@ local function InitPlayerState(player: Player)
 		stamina = 100,
 		state = Enums.PlayerState.Alive,
 		inventory = {},  -- { { itemId, quantity } }
-		maxSlots = Config.Player.MaxInventorySlots,
+		maxSlots = Config.Player.MaxInventorySlots,  -- 5 by default
+		equippedWeapon = "baseball_bat",  -- equipped weapon (separate from backpack)
 		knownRecipes = {},
 		buffs = {},  -- { { type, amount, expiresAt } }
 		isSprinting = false,
@@ -2911,14 +3020,6 @@ local function InitPlayerState(player: Player)
 		scrap = 0,
 		purgeCoins = 0,
 	}
-
-	-- Starter weapon: Baseball Bat so players can defend themselves
-	table.insert(PlayerStates[player].inventory, {
-		itemId = "baseball_bat",
-		quantity = 1,
-		spoilDay = -1,
-		pickedUpDay = 0,
-	})
 
 	-- Add starter recipes
 	local RecipeDB = require(Modules.RecipeDatabase)
@@ -3353,7 +3454,11 @@ end
 RequestInventory.OnServerInvoke = function(player)
 	local state = PlayerStates[player]
 	if not state then return {} end
-	return state.inventory
+	return {
+		inventory = state.inventory,
+		maxSlots = state.maxSlots,
+		equippedWeapon = state.equippedWeapon,
+	}
 end
 
 -- Refuel generator
@@ -3623,12 +3728,185 @@ GetFortSlotBF.OnInvoke = function(slotName)
 	return GameState.house.fortifications[slotName]
 end
 
+------------------------------------------------------------------------
+-- Equip / Unequip Weapon
+------------------------------------------------------------------------
+EquipItem.OnServerEvent:Connect(function(player, slotIndex)
+	local state = PlayerStates[player]
+	if not state then return end
+
+	if slotIndex == nil or slotIndex == 0 then
+		-- Unequip current weapon back to inventory
+		if state.equippedWeapon then
+			local ItemDB = require(Modules.ItemDatabase)
+			local weaponData = ItemDB.GetItem(state.equippedWeapon)
+			if weaponData then
+				-- Try to add back to inventory
+				if #state.inventory &lt; state.maxSlots then
+					table.insert(state.inventory, {
+						itemId = state.equippedWeapon,
+						quantity = 1,
+						spoilDay = -1,
+						pickedUpDay = GameState.currentDay,
+					})
+				else
+					NotifyPlayers:FireClient(player, "Backpack full! Can't unequip.", Color3.fromRGB(255, 100, 100))
+					return
+				end
+			end
+			state.equippedWeapon = nil
+			UpdateHUD:FireClient(player, "EquippedWeapon", nil)
+			UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
+		end
+		return
+	end
+
+	local slot = state.inventory[slotIndex]
+	if not slot then return end
+
+	local ItemDB = require(Modules.ItemDatabase)
+	local itemData = ItemDB.GetItem(slot.itemId)
+	if not itemData or itemData.category ~= Enums.ItemCategory.Weapon then
+		NotifyPlayers:FireClient(player, "Can only equip weapons!", Color3.fromRGB(255, 100, 100))
+		return
+	end
+
+	-- If already have a weapon equipped, swap it back to inventory
+	if state.equippedWeapon then
+		local oldWeapon = state.equippedWeapon
+		state.equippedWeapon = slot.itemId
+		-- Replace the inventory slot with the old weapon
+		slot.itemId = oldWeapon
+		slot.quantity = 1
+		slot.spoilDay = -1
+	else
+		-- Equip from inventory, remove from backpack
+		state.equippedWeapon = slot.itemId
+		table.remove(state.inventory, slotIndex)
+	end
+
+	UpdateHUD:FireClient(player, "EquippedWeapon", state.equippedWeapon)
+	UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
+	NotifyPlayers:FireClient(player, "Equipped " .. itemData.name, Color3.fromRGB(100, 200, 255))
+end)
+
+------------------------------------------------------------------------
+-- Backpack Upgrade (called by InventoryService when a backpack is picked up)
+------------------------------------------------------------------------
+local UpgradeBackpackBF = Instance.new("BindableFunction")
+UpgradeBackpackBF.Name = "UpgradeBackpack"
+UpgradeBackpackBF.Parent = game.ServerStorage
+UpgradeBackpackBF.OnInvoke = function(player, newMaxSlots)
+	local state = PlayerStates[player]
+	if not state then return false end
+
+	if newMaxSlots &gt; state.maxSlots then
+		state.maxSlots = newMaxSlots
+		UpdateHUD:FireClient(player, "BackpackUpgrade", state.maxSlots)
+		return true
+	end
+	return false
+end
+
+------------------------------------------------------------------------
+-- Base Expansion
+------------------------------------------------------------------------
+UpgradeBase.OnServerEvent:Connect(function(player)
+	local state = PlayerStates[player]
+	if not state then return end
+
+	-- Check player is at their base
+	local char = player.Character
+	if not char then return end
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+
+	-- Find starter house
+	local starterHouse = MapFolder and MapFolder:FindFirstChild("StarterHouse")
+	if not starterHouse then
+		local mapFolder = workspace:FindFirstChild("Map")
+		if mapFolder then
+			starterHouse = mapFolder:FindFirstChild("StarterHouse")
+		end
+	end
+	if not starterHouse then
+		NotifyPlayers:FireClient(player, "Can't find your base!", Color3.fromRGB(255, 100, 100))
+		return
+	end
+
+	local currentLevel = GameState.house.baseLevel
+	if currentLevel &gt;= Config.BaseExpansion.MaxLevel then
+		NotifyPlayers:FireClient(player, "Base is fully upgraded!", Color3.fromRGB(255, 200, 50))
+		return
+	end
+
+	local nextLevel = currentLevel + 1
+	local costs = Config.BaseExpansion.Costs[nextLevel]
+	if not costs then return end
+
+	-- Check if player has all required materials
+	local ItemDB = require(Modules.ItemDatabase)
+	for itemId, needed in pairs(costs) do
+		local count = 0
+		for _, slot in ipairs(state.inventory) do
+			if slot.itemId == itemId then
+				count = count + slot.quantity
+			end
+		end
+		if count &lt; needed then
+			local itemData = ItemDB.GetItem(itemId)
+			local name = itemData and itemData.name or itemId
+			NotifyPlayers:FireClient(player,
+				"Need " .. needed .. "x " .. name .. " (have " .. count .. ")",
+				Color3.fromRGB(255, 100, 100))
+			return
+		end
+	end
+
+	-- Consume materials
+	for itemId, needed in pairs(costs) do
+		local remaining = needed
+		for i = #state.inventory, 1, -1 do
+			local slot = state.inventory[i]
+			if slot.itemId == itemId then
+				local take = math.min(remaining, slot.quantity)
+				slot.quantity = slot.quantity - take
+				remaining = remaining - take
+				if slot.quantity &lt;= 0 then
+					table.remove(state.inventory, i)
+				end
+				if remaining &lt;= 0 then break end
+			end
+		end
+	end
+
+	-- Upgrade base level
+	GameState.house.baseLevel = nextLevel
+
+	-- Signal MapBuilder to expand the house
+	local expandSignal = game.ServerStorage:FindFirstChild("ExpandBaseSignal")
+	if expandSignal then
+		expandSignal:Fire(nextLevel)
+	end
+
+	UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
+	NotifyPlayers:FireAllClients(
+		"Base upgraded to Level " .. nextLevel .. "!",
+		Color3.fromRGB(0, 255, 100))
+	UpdateHUD:FireAllClients("BaseLevel", nextLevel)
+end)
+
+-- Create expand signal for MapBuilder
+local expandSignal = Instance.new("BindableEvent")
+expandSignal.Name = "ExpandBaseSignal"
+expandSignal.Parent = game.ServerStorage
+
 print("[GameManager] Initialized - The Purge: Suburban Survival")
 </ProtectedString>
         <bool name="Disabled">false</bool>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX0000002C">
+    <Item class="Script" referent="RBX0000002E">
       <Properties>
         <string name="Name">InventoryService</string>
         <ProtectedString name="Source">--[[
@@ -3857,15 +4135,40 @@ PickupItem.OnServerEvent:Connect(function(player, lootInstance)
 	local quantity = lootInstance:GetAttribute("Quantity") or 1
 	if not itemId then return end
 
-	-- Add to inventory
+	local itemData = ItemDatabase.GetItem(itemId)
+	if not itemData then return end
+
+	-- Backpack pickup: auto-upgrade inventory capacity
+	if itemData.category == Enums.ItemCategory.Backpack then
+		local backpackSlots = itemData.backpackSlots or 10
+		local upgrader = game.ServerStorage:FindFirstChild("UpgradeBackpack")
+		if upgrader then
+			local upgraded = upgrader:Invoke(player, backpackSlots)
+			if upgraded then
+				lootInstance:Destroy()
+				NotifyPlayers:FireClient(player,
+					"Found " .. itemData.name .. "! Backpack upgraded to " .. backpackSlots .. " slots!",
+					Color3.fromRGB(50, 255, 100))
+			else
+				NotifyPlayers:FireClient(player,
+					"Already have a better backpack!",
+					Color3.fromRGB(255, 200, 50))
+			end
+		end
+		return
+	end
+
+	-- Add to inventory (backpack)
 	if InventoryService.AddItem(player, itemId, quantity) then
 		-- Remove from world
 		lootInstance:Destroy()
 
-		local itemData = ItemDatabase.GetItem(itemId)
-		local name = itemData and itemData.name or itemId
+		local name = itemData.name or itemId
+		local state = GetPlayerState(player)
+		local slotCount = state and #state.inventory or 0
+		local maxSlots = state and state.maxSlots or Config.Player.MaxInventorySlots
 		NotifyPlayers:FireClient(player,
-			"Picked up " .. name .. (quantity &gt; 1 and (" x" .. quantity) or ""),
+			name .. (quantity &gt; 1 and (" x" .. quantity) or "") .. " stored in backpack [" .. slotCount .. "/" .. maxSlots .. "]",
 			Color3.fromRGB(200, 200, 255)
 		)
 	end
@@ -4021,7 +4324,7 @@ print("[InventoryService] Initialized")
         <bool name="Disabled">false</bool>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX0000002D">
+    <Item class="Script" referent="RBX0000002F">
       <Properties>
         <string name="Name">LootService</string>
         <ProtectedString name="Source">--[[
@@ -4373,7 +4676,7 @@ print("[LootService] Initialized")
         <bool name="Disabled">false</bool>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX0000002E">
+    <Item class="Script" referent="RBX00000030">
       <Properties>
         <string name="Name">FortificationService</string>
         <ProtectedString name="Source">--[[
@@ -4764,7 +5067,7 @@ print("[FortificationService] Initialized")
         <bool name="Disabled">false</bool>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX0000002F">
+    <Item class="Script" referent="RBX00000031">
       <Properties>
         <string name="Name">ElectricityService</string>
         <ProtectedString name="Source">--[[
@@ -5008,7 +5311,7 @@ print("[ElectricityService] Initialized")
         <bool name="Disabled">false</bool>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX00000030">
+    <Item class="Script" referent="RBX00000032">
       <Properties>
         <string name="Name">PurgeService</string>
         <ProtectedString name="Source">--[[
@@ -5547,7 +5850,7 @@ print("[PurgeService] Initialized")
         <bool name="Disabled">false</bool>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX00000031">
+    <Item class="Script" referent="RBX00000033">
       <Properties>
         <string name="Name">CookingService</string>
         <ProtectedString name="Source">--[[
@@ -5881,7 +6184,7 @@ print("[CookingService] Initialized")
         <bool name="Disabled">false</bool>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX00000032">
+    <Item class="Script" referent="RBX00000034">
       <Properties>
         <string name="Name">CombatService</string>
         <ProtectedString name="Source">--[[
@@ -6194,7 +6497,7 @@ print("[CombatService] Initialized")
         <bool name="Disabled">false</bool>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX00000033">
+    <Item class="Script" referent="RBX00000035">
       <Properties>
         <string name="Name">NPCService</string>
         <ProtectedString name="Source">--[[
@@ -6706,7 +7009,7 @@ print("[NPCService] Initialized")
         <bool name="Disabled">false</bool>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX00000034">
+    <Item class="Script" referent="RBX00000036">
       <Properties>
         <string name="Name">LobbyService</string>
         <ProtectedString name="Source">--[[
@@ -7012,7 +7315,7 @@ print("[LobbyService] Initialized")
         <bool name="Disabled">false</bool>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX00000035">
+    <Item class="Script" referent="RBX00000037">
       <Properties>
         <string name="Name">DataService</string>
         <ProtectedString name="Source">--[[
@@ -7399,7 +7702,7 @@ print("[DataService] Initialized")
         <bool name="Disabled">false</bool>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX00000036">
+    <Item class="Script" referent="RBX00000038">
       <Properties>
         <string name="Name">MonetizationService</string>
         <ProtectedString name="Source">--[[
@@ -7900,7 +8203,7 @@ print("[MonetizationService] Initialized — Cosmetics only, no pay-to-win!")
         <bool name="Disabled">false</bool>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX00000037">
+    <Item class="Script" referent="RBX00000039">
       <Properties>
         <string name="Name">MapBuilder</string>
         <ProtectedString name="Source">--[[
@@ -8215,9 +8518,11 @@ local function CreateHouseLot(baseCFrame: CFrame, zone: number, houseIndex: numb
 	local depths  = { 18, 22, 30 }
 	local heights = { 10, 12, 14 }
 
-	local w = isStarter and 22 or (widths[zone] or 22)
-	local d = isStarter and 18 or (depths[zone] or 18)
-	local h = isStarter and 10 or (heights[zone] or 10)
+	-- Starter house uses base expansion dimensions (level 1 = 28x22)
+	local starterDims = Config.BaseExpansion.Dimensions[1]
+	local w = isStarter and starterDims[1] or (widths[zone] or 22)
+	local d = isStarter and starterDims[2] or (depths[zone] or 18)
+	local h = isStarter and starterDims[3] or (heights[zone] or 10)
 
 	-- Lot dimensions
 	local lotWidth = w + 18  -- house + side gaps
@@ -8819,6 +9124,26 @@ local function CreateHouseLot(baseCFrame: CFrame, zone: number, houseIndex: numb
 			})
 		end
 
+		-- Upgrade Workbench (inside house, for base expansion)
+		CreatePart({
+			Name = "UpgradeWorkbench",
+			Size = Vector3.new(3, 2.5, 2),
+			CFrame = houseCF * CFrame.new(w / 3, 1.25, d / 4),
+			Material = Enum.Material.Wood,
+			Color = Color3.fromRGB(100, 75, 45),
+			Parent = houseFolder,
+			Tags = { "UpgradeStation" },
+		})
+		-- Workbench top
+		CreatePart({
+			Name = "WorkbenchTop",
+			Size = Vector3.new(3.2, 0.15, 2.2),
+			CFrame = houseCF * CFrame.new(w / 3, 2.58, d / 4),
+			Material = Enum.Material.Wood,
+			Color = Color3.fromRGB(120, 90, 55),
+			Parent = houseFolder,
+		})
+
 		-- Spawn point
 		CreatePart({
 			Name = "StarterHouseSpawn",
@@ -8830,7 +9155,7 @@ local function CreateHouseLot(baseCFrame: CFrame, zone: number, houseIndex: numb
 		})
 	end
 
-	return houseFolder
+	return houseFolder, houseCF
 end
 
 ------------------------------------------------------------------------
@@ -9183,6 +9508,109 @@ local function BuildMap()
 end
 
 ------------------------------------------------------------------------
+-- Base Expansion: add rooms when base level increases
+------------------------------------------------------------------------
+local function ExpandBase(newLevel)
+	local starterHouse = MapFolder:FindFirstChild("StarterHouse")
+	if not starterHouse then return end
+
+	local dims = Config.BaseExpansion.Dimensions[newLevel]
+	if not dims then return end
+
+	local newW, newD, newH = dims[1], dims[2], dims[3]
+	local oldDims = Config.BaseExpansion.Dimensions[newLevel - 1]
+	local oldW, oldD = oldDims[1], oldDims[2]
+
+	-- Find the house CFrame from the foundation
+	local foundation = starterHouse:FindFirstChild("Foundation")
+	if not foundation then return end
+	local houseCF = foundation.CFrame * CFrame.new(0, -0.25, 0)
+
+	-- Add expansion room on the side of the house
+	local expansionSide = (newLevel % 2 == 0) and 1 or -1
+	local addedWidth = (newW - oldW)
+	local roomCF = houseCF * CFrame.new(expansionSide * (oldW / 2 + addedWidth / 2), 0, 0)
+
+	local levelNames = { [2] = "Storage Room", [3] = "Workshop", [4] = "Armory" }
+	local roomName = levelNames[newLevel] or "Expansion"
+
+	-- Room floor
+	CreatePart({
+		Name = roomName .. "_Floor",
+		Size = Vector3.new(addedWidth, 0.3, oldD * 0.8),
+		CFrame = roomCF * CFrame.new(0, 0.65, 0),
+		Material = Enum.Material.WoodPlanks,
+		Color = Color3.fromRGB(110, 85, 55),
+		Parent = starterHouse,
+	})
+
+	-- Room walls
+	-- Outer side wall
+	CreatePart({
+		Name = roomName .. "_WallOuter",
+		Size = Vector3.new(1, newH, oldD * 0.8),
+		CFrame = roomCF * CFrame.new(expansionSide * addedWidth / 2, newH / 2 + 0.5, 0),
+		Material = Enum.Material.Brick,
+		Color = Color3.fromRGB(130, 95, 70),
+		Parent = starterHouse,
+	})
+
+	-- Front wall
+	CreatePart({
+		Name = roomName .. "_WallFront",
+		Size = Vector3.new(addedWidth, newH, 1),
+		CFrame = roomCF * CFrame.new(0, newH / 2 + 0.5, -oldD * 0.4),
+		Material = Enum.Material.Brick,
+		Color = Color3.fromRGB(130, 95, 70),
+		Parent = starterHouse,
+	})
+
+	-- Back wall
+	CreatePart({
+		Name = roomName .. "_WallBack",
+		Size = Vector3.new(addedWidth, newH, 1),
+		CFrame = roomCF * CFrame.new(0, newH / 2 + 0.5, oldD * 0.4),
+		Material = Enum.Material.Brick,
+		Color = Color3.fromRGB(130, 95, 70),
+		Parent = starterHouse,
+	})
+
+	-- Room roof
+	CreatePart({
+		Name = roomName .. "_Roof",
+		Size = Vector3.new(addedWidth + 2, 0.6, oldD * 0.8 + 2),
+		CFrame = roomCF * CFrame.new(0, newH + 0.8, 0),
+		Material = Enum.Material.Slate,
+		Color = Color3.fromRGB(75, 55, 45),
+		Parent = starterHouse,
+	})
+
+	-- Loot container in the new room (table with items)
+	CreatePart({
+		Name = roomName .. "_Table",
+		Size = Vector3.new(3, 2, 2),
+		CFrame = roomCF * CFrame.new(0, 1, 0),
+		Material = Enum.Material.Wood,
+		Color = Color3.fromRGB(110, 80, 50),
+		Parent = starterHouse,
+		Tags = { "LootContainer" },
+		Attributes = { Zone = math.min(newLevel, 3), ContainerIndex = 10 + newLevel, FurnitureType = "Table" },
+	})
+
+	print("[MapBuilder] Base expanded to level " .. newLevel .. " — added " .. roomName)
+end
+
+-- Listen for expansion signal from GameManager
+task.defer(function()
+	local expandSignal = game.ServerStorage:WaitForChild("ExpandBaseSignal", 30)
+	if expandSignal then
+		expandSignal.Event:Connect(function(newLevel)
+			ExpandBase(newLevel)
+		end)
+	end
+end)
+
+------------------------------------------------------------------------
 -- Build on startup
 ------------------------------------------------------------------------
 task.defer(BuildMap)
@@ -9191,22 +9619,22 @@ task.defer(BuildMap)
       </Properties>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="RBX00000038">
+  <Item class="StarterPlayer" referent="RBX0000003A">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="Folder" referent="RBX00000039">
+    <Item class="Folder" referent="RBX0000003B">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="RBX0000003A">
+      <Item class="LocalScript" referent="RBX0000003C">
         <Properties>
           <string name="Name">UIController</string>
           <ProtectedString name="Source">--[[
 	UIController.client.lua
 	Client-side HUD and UI management.
-	Displays: Hunger bar, Power meter, Inventory, Purge countdown,
-	Mini-map, Crafting menu, and all game state indicators.
+	Displays: Health, Hunger, Stamina, Equipped Weapon, Backpack Inventory,
+	Power meter, Purge countdown, and all game state indicators.
 ]]
 
 local Players = game:GetService("Players")
@@ -9234,6 +9662,7 @@ local PurgeEnded = Remotes:WaitForChild("PurgeEnded")
 local DayChanged = Remotes:WaitForChild("DayChanged")
 local NotifyPlayers = Remotes:WaitForChild("NotifyPlayers")
 local PowerOutAlert = Remotes:WaitForChild("PowerOutAlert")
+local EquipItem = Remotes:WaitForChild("EquipItem")
 
 ------------------------------------------------------------------------
 -- Create Main HUD ScreenGui
@@ -9369,14 +9798,6 @@ local HungerContainer, HungerFill, HungerLabel = CreateBar({
 	Parent = HUD,
 })
 
-local HungerIcon = CreateLabel({
-	Name = "HungerIcon",
-	Size = UDim2.new(0, 20, 0, 20),
-	Position = UDim2.new(0, -22, 0, 88),
-	Text = "",
-	Parent = HUD,
-})
-
 ------------------------------------------------------------------------
 -- Stamina Bar
 ------------------------------------------------------------------------
@@ -9388,6 +9809,80 @@ local StaminaContainer, StaminaFill, StaminaLabel = CreateBar({
 	LabelText = "Stamina",
 	Parent = HUD,
 })
+
+------------------------------------------------------------------------
+-- Equipped Weapon Display (below stamina bar)
+------------------------------------------------------------------------
+local WeaponFrame = CreateFrame({
+	Name = "EquippedWeapon",
+	Size = UDim2.new(0, 220, 0, 36),
+	Position = UDim2.new(0, 15, 0, 140),
+	BackgroundTransparency = 0.4,
+	Corner = 6,
+})
+
+local WeaponIcon = CreateLabel({
+	Name = "Icon",
+	Size = UDim2.new(0, 28, 0, 28),
+	Position = UDim2.new(0, 4, 0, 4),
+	Text = "",
+	TextColor3 = Color3.fromRGB(200, 200, 200),
+	Font = Enum.Font.GothamBold,
+	Parent = WeaponFrame,
+})
+
+local WeaponNameLabel = CreateLabel({
+	Name = "WeaponName",
+	Size = UDim2.new(1, -40, 0, 18),
+	Position = UDim2.new(0, 36, 0, 2),
+	Text = "Baseball Bat",
+	TextColor3 = Color3.fromRGB(100, 200, 255),
+	TextXAlignment = Enum.TextXAlignment.Left,
+	Font = Enum.Font.GothamBold,
+	Parent = WeaponFrame,
+})
+
+local WeaponDmgLabel = CreateLabel({
+	Name = "WeaponDmg",
+	Size = UDim2.new(1, -40, 0, 14),
+	Position = UDim2.new(0, 36, 0, 20),
+	Text = "DMG: 18 | Melee",
+	TextColor3 = Color3.fromRGB(180, 180, 180),
+	TextXAlignment = Enum.TextXAlignment.Left,
+	Font = Enum.Font.Gotham,
+	Parent = WeaponFrame,
+})
+
+local function UpdateEquippedWeaponDisplay(weaponId)
+	if not weaponId then
+		WeaponNameLabel.Text = "No weapon"
+		WeaponDmgLabel.Text = "Unarmed"
+		WeaponNameLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+		return
+	end
+
+	local itemData = ItemDatabase.GetItem(weaponId)
+	if not itemData then
+		WeaponNameLabel.Text = weaponId
+		WeaponDmgLabel.Text = ""
+		return
+	end
+
+	local tierColor = Enums.TierColor[itemData.tier] or Color3.new(1, 1, 1)
+	WeaponNameLabel.Text = itemData.name
+	WeaponNameLabel.TextColor3 = tierColor
+
+	local dmgText = "DMG: " .. (itemData.damage or "?")
+	if itemData.weaponType == "Melee" then
+		dmgText = dmgText .. " | Melee"
+	elseif itemData.weaponType == "Ranged" then
+		dmgText = dmgText .. " | Range: " .. (itemData.range or "?")
+	end
+	WeaponDmgLabel.Text = dmgText
+end
+
+-- Show default equipped weapon
+UpdateEquippedWeaponDisplay("baseball_bat")
 
 ------------------------------------------------------------------------
 -- Power Meter (bottom-right)
@@ -9514,39 +10009,62 @@ local function ShowNotification(text: string, color: Color3?)
 end
 
 ------------------------------------------------------------------------
--- Inventory Display (bottom-center)
+-- Inventory Display (bottom-center) — Dynamic slots based on maxSlots
 ------------------------------------------------------------------------
+local currentMaxSlots = Config.Player.MaxInventorySlots  -- starts at 5
+
 local InventoryFrame = CreateFrame({
 	Name = "InventoryBar",
-	Size = UDim2.new(0, 600, 0, 60),
-	Position = UDim2.new(0.5, 0, 1, -15),
+	Size = UDim2.new(0, 600, 0, 75),
+	Position = UDim2.new(0.5, 0, 1, -10),
 	AnchorPoint = Vector2.new(0.5, 1),
 	BackgroundTransparency = 0.5,
 	Corner = 8,
+})
+
+-- Backpack capacity label above inventory
+local BackpackLabel = CreateLabel({
+	Name = "BackpackLabel",
+	Size = UDim2.new(1, 0, 0, 14),
+	Position = UDim2.new(0, 0, 0, 1),
+	Text = "Backpack [0/" .. currentMaxSlots .. "]",
+	TextColor3 = Color3.fromRGB(180, 200, 180),
+	Font = Enum.Font.Gotham,
+	Parent = InventoryFrame,
+})
+
+local InventorySlotContainer = CreateFrame({
+	Name = "SlotContainer",
+	Size = UDim2.new(1, -8, 0, 52),
+	Position = UDim2.new(0, 4, 0, 17),
+	BackgroundTransparency = 1,
+	Parent = InventoryFrame,
 })
 
 local InventoryLayout = Instance.new("UIListLayout")
 InventoryLayout.FillDirection = Enum.FillDirection.Horizontal
 InventoryLayout.SortOrder = Enum.SortOrder.LayoutOrder
 InventoryLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-InventoryLayout.Padding = UDim.new(0, 4)
-InventoryLayout.Parent = InventoryFrame
+InventoryLayout.Padding = UDim.new(0, 3)
+InventoryLayout.Parent = InventorySlotContainer
 
--- Create inventory slots
 local InventorySlots = {}
-for i = 1, Config.Player.MaxInventorySlots do
+
+local function CreateInventorySlot(index)
+	local slotWidth = math.min(50, math.floor(580 / currentMaxSlots) - 4)
 	local slot = CreateFrame({
-		Name = "Slot_" .. i,
-		Size = UDim2.new(0, 36, 0, 50),
+		Name = "Slot_" .. index,
+		Size = UDim2.new(0, slotWidth, 0, 50),
 		BackgroundColor3 = Color3.fromRGB(40, 40, 40),
 		BackgroundTransparency = 0.3,
-		Parent = InventoryFrame,
+		Parent = InventorySlotContainer,
 		Corner = 4,
 	})
 
 	local nameLabel = CreateLabel({
 		Name = "ItemName",
-		Size = UDim2.new(1, 0, 0.6, 0),
+		Size = UDim2.new(1, -2, 0.6, 0),
+		Position = UDim2.new(0, 1, 0, 0),
 		Text = "",
 		TextColor3 = Color3.new(1, 1, 1),
 		Font = Enum.Font.Gotham,
@@ -9555,27 +10073,59 @@ for i = 1, Config.Player.MaxInventorySlots do
 
 	local countLabel = CreateLabel({
 		Name = "Count",
-		Size = UDim2.new(1, 0, 0.3, 0),
-		Position = UDim2.new(0, 0, 0.7, 0),
+		Size = UDim2.new(1, -2, 0.3, 0),
+		Position = UDim2.new(0, 1, 0.7, 0),
 		Text = "",
 		TextColor3 = Color3.fromRGB(200, 200, 200),
 		Font = Enum.Font.Gotham,
 		Parent = slot,
 	})
 
-	InventorySlots[i] = {
+	return {
 		frame = slot,
 		nameLabel = nameLabel,
 		countLabel = countLabel,
 	}
 end
 
+local function RebuildInventorySlots(maxSlots)
+	-- Clear existing slots
+	for _, slotData in ipairs(InventorySlots) do
+		slotData.frame:Destroy()
+	end
+	InventorySlots = {}
+
+	currentMaxSlots = maxSlots
+
+	for i = 1, maxSlots do
+		InventorySlots[i] = CreateInventorySlot(i)
+	end
+
+	BackpackLabel.Text = "Backpack [0/" .. maxSlots .. "]"
+end
+
+-- Initialize with default slot count
+RebuildInventorySlots(currentMaxSlots)
+
 local function UpdateInventoryDisplay(inventory)
+	local filledCount = inventory and #inventory or 0
+	BackpackLabel.Text = "Backpack [" .. filledCount .. "/" .. currentMaxSlots .. "]"
+
+	-- Color the label based on capacity
+	if filledCount &gt;= currentMaxSlots then
+		BackpackLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+	elseif filledCount &gt;= currentMaxSlots * 0.8 then
+		BackpackLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+	else
+		BackpackLabel.TextColor3 = Color3.fromRGB(180, 200, 180)
+	end
+
 	for i, slot in ipairs(InventorySlots) do
 		local item = inventory and inventory[i] or nil
 		if item then
 			local itemData = ItemDatabase.GetItem(item.itemId)
-			slot.nameLabel.Text = itemData and string.sub(itemData.name, 1, 6) or "?"
+			local charLimit = currentMaxSlots &gt; 10 and 5 or 6
+			slot.nameLabel.Text = itemData and string.sub(itemData.name, 1, charLimit) or "?"
 			slot.countLabel.Text = item.quantity &gt; 1 and ("x" .. item.quantity) or ""
 
 			local tierColor = itemData and Enums.TierColor[itemData.tier] or Color3.new(1, 1, 1)
@@ -9629,7 +10179,7 @@ local PurgeCoinsLabel = CreateLabel({
 local BuffFrame = CreateFrame({
 	Name = "Buffs",
 	Size = UDim2.new(0, 200, 0, 25),
-	Position = UDim2.new(0, 15, 0, 138),
+	Position = UDim2.new(0, 15, 0, 182),
 	BackgroundTransparency = 1,
 })
 
@@ -9702,6 +10252,18 @@ UpdateHUD.OnClientEvent:Connect(function(updateType, data)
 	elseif updateType == "InventoryUpdate" then
 		UpdateInventoryDisplay(data)
 
+	elseif updateType == "EquippedWeapon" then
+		UpdateEquippedWeaponDisplay(data)
+
+	elseif updateType == "BackpackUpgrade" then
+		-- data = new max slots
+		RebuildInventorySlots(data)
+		ShowNotification("Backpack upgraded! " .. data .. " slots now available.", Color3.fromRGB(50, 255, 100))
+
+	elseif updateType == "BaseLevel" then
+		local levelNames = { "Starter", "Expanded", "Reinforced", "Fortified" }
+		ShowNotification("Base Level: " .. (levelNames[data] or data), Color3.fromRGB(0, 255, 100))
+
 	elseif updateType == "PurgeStatus" then
 		if data.purgeActive then
 			PurgeFrame.Visible = true
@@ -9743,7 +10305,6 @@ UpdateHUD.OnClientEvent:Connect(function(updateType, data)
 		end)
 
 	elseif updateType == "GeneratorFlicker" then
-		-- Brief screen darken
 		if data then
 			HUD.BackgroundTransparency = 0.8
 		else
@@ -9841,7 +10402,7 @@ print("[UIController] HUD Initialized")
           <bool name="Disabled">false</bool>
         </Properties>
       </Item>
-      <Item class="LocalScript" referent="RBX0000003B">
+      <Item class="LocalScript" referent="RBX0000003D">
         <Properties>
           <string name="Name">InputController</string>
           <ProtectedString name="Source">--[[
@@ -10050,7 +10611,7 @@ print("[InputController] Initialized")
           <bool name="Disabled">false</bool>
         </Properties>
       </Item>
-      <Item class="LocalScript" referent="RBX0000003C">
+      <Item class="LocalScript" referent="RBX0000003E">
         <Properties>
           <string name="Name">AtmosphereController</string>
           <ProtectedString name="Source">--[[
@@ -10666,19 +11227,21 @@ print("[AtmosphereController] Initialized with full audio/visual effects")
           <bool name="Disabled">false</bool>
         </Properties>
       </Item>
-      <Item class="LocalScript" referent="RBX0000003D">
+      <Item class="LocalScript" referent="RBX0000003F">
         <Properties>
           <string name="Name">InteractionController</string>
           <ProtectedString name="Source">--[[
 	InteractionController.client.lua
-	Handles proximity-based interactions: loot pickup, cooking stations,
-	generator interaction, fortification slots, and reviving teammates.
+	Handles proximity-based interactions: loot pickup (store in backpack),
+	cooking stations, generator interaction, fortification slots,
+	base upgrades, and reviving teammates.
 ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local CollectionService = game:GetService("CollectionService")
+local TweenService = game:GetService("TweenService")
 
 local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
@@ -10698,6 +11261,97 @@ local RefuelRequest = Remotes:WaitForChild("RefuelRequest")
 local ReviveRequest = Remotes:WaitForChild("ReviveRequest")
 local InteractRequest = Remotes:WaitForChild("InteractRequest")
 local UpdateHUD = Remotes:WaitForChild("UpdateHUD")
+local UpgradeBase = Remotes:WaitForChild("UpgradeBase")
+
+------------------------------------------------------------------------
+-- Pickup Popup (brief "Store in Backpack" confirmation)
+------------------------------------------------------------------------
+local PickupPopup = nil
+
+local function ShowPickupPopup(lootPart)
+	if PickupPopup then PickupPopup:Destroy() end
+
+	local itemId = lootPart:GetAttribute("ItemId")
+	local quantity = lootPart:GetAttribute("Quantity") or 1
+	if not itemId then return end
+
+	local itemData = ItemDatabase.GetItem(itemId)
+	if not itemData then return end
+
+	local tierColor = Enums.TierColor[itemData.tier] or Color3.new(1, 1, 1)
+
+	PickupPopup = Instance.new("ScreenGui")
+	PickupPopup.Name = "PickupPopup"
+	PickupPopup.Parent = PlayerGui
+
+	local frame = Instance.new("Frame")
+	frame.Name = "PopupFrame"
+	frame.Size = UDim2.new(0, 280, 0, 100)
+	frame.Position = UDim2.new(0.5, 0, 0.65, 0)
+	frame.AnchorPoint = Vector2.new(0.5, 0.5)
+	frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+	frame.BackgroundTransparency = 0.15
+	frame.BorderSizePixel = 0
+	frame.Parent = PickupPopup
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 8)
+	corner.Parent = frame
+
+	-- Item name
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Size = UDim2.new(1, -10, 0, 24)
+	nameLabel.Position = UDim2.new(0, 5, 0, 5)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Text = itemData.name .. (quantity &gt; 1 and (" x" .. quantity) or "")
+	nameLabel.TextColor3 = tierColor
+	nameLabel.TextScaled = true
+	nameLabel.Font = Enum.Font.GothamBold
+	nameLabel.Parent = frame
+
+	-- Tier label
+	local tierLabel = Instance.new("TextLabel")
+	tierLabel.Size = UDim2.new(1, -10, 0, 16)
+	tierLabel.Position = UDim2.new(0, 5, 0, 28)
+	tierLabel.BackgroundTransparency = 1
+	tierLabel.Text = itemData.tier .. " " .. itemData.category
+	tierLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+	tierLabel.TextScaled = true
+	tierLabel.Font = Enum.Font.Gotham
+	tierLabel.Parent = frame
+
+	-- "Store in Backpack" button
+	local storeBtn = Instance.new("TextButton")
+	storeBtn.Size = UDim2.new(0.9, 0, 0, 32)
+	storeBtn.Position = UDim2.new(0.05, 0, 1, -40)
+	storeBtn.BackgroundColor3 = Color3.fromRGB(40, 80, 40)
+	storeBtn.Text = "Store in Backpack"
+	storeBtn.TextColor3 = Color3.fromRGB(200, 255, 200)
+	storeBtn.TextScaled = true
+	storeBtn.Font = Enum.Font.GothamBold
+	storeBtn.BorderSizePixel = 0
+	storeBtn.Parent = frame
+
+	local btnCorner = Instance.new("UICorner")
+	btnCorner.CornerRadius = UDim.new(0, 6)
+	btnCorner.Parent = storeBtn
+
+	storeBtn.MouseButton1Click:Connect(function()
+		PickupItem:FireServer(lootPart)
+		if PickupPopup then
+			PickupPopup:Destroy()
+			PickupPopup = nil
+		end
+	end)
+
+	-- Auto-dismiss after 5 seconds
+	task.delay(5, function()
+		if PickupPopup then
+			PickupPopup:Destroy()
+			PickupPopup = nil
+		end
+	end)
+end
 
 ------------------------------------------------------------------------
 -- Proximity Prompt Handler
@@ -10708,9 +11362,9 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
 	local part = prompt.Parent
 	if not part then return end
 
-	-- Loot Item Pickup
+	-- Loot Item Pickup — show "Store in Backpack" popup
 	if CollectionService:HasTag(part, "LootItem") then
-		PickupItem:FireServer(part)
+		ShowPickupPopup(part)
 		return
 	end
 
@@ -10720,12 +11374,9 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
 		local built = part:GetAttribute("Built")
 
 		if not built then
-			-- Prompt to build
-			-- TODO: Show build UI
 			return
 		end
 
-		-- Request recipe list from server
 		CookRequest:FireServer("GetRecipes", stationType)
 		OpenCookingUI(stationType, part)
 		return
@@ -10733,7 +11384,6 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
 
 	-- Fortification Slot (only allow on your own StarterHouse)
 	if CollectionService:HasTag(part, "FortSlot") then
-		-- Check if this slot is inside the StarterHouse
 		local isOwnBase = false
 		local parent = part.Parent
 		while parent do
@@ -10745,9 +11395,6 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
 		end
 
 		if not isOwnBase then
-			-- Notify player they can't fortify other houses
-			local NotifyPlayers = Remotes:FindFirstChild("NotifyPlayers")
-			-- Just show a local message since we can't fire server events to ourselves
 			return
 		end
 
@@ -10761,6 +11408,12 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
 	-- Generator
 	if CollectionService:HasTag(part, "Generator") then
 		OpenGeneratorUI()
+		return
+	end
+
+	-- Base Upgrade Workbench
+	if CollectionService:HasTag(part, "UpgradeStation") then
+		UpgradeBase:FireServer()
 		return
 	end
 
@@ -10861,9 +11514,9 @@ function OpenCookingUI(stationType: string, stationPart: BasePart)
 			recipeBtn.AutoButtonColor = recipe.canCook
 			recipeBtn.Parent = scrollFrame
 
-			local btnCorner = Instance.new("UICorner")
-			btnCorner.CornerRadius = UDim.new(0, 6)
-			btnCorner.Parent = recipeBtn
+			local btnCorner2 = Instance.new("UICorner")
+			btnCorner2.CornerRadius = UDim.new(0, 6)
+			btnCorner2.Parent = recipeBtn
 
 			local nameLabel = Instance.new("TextLabel")
 			nameLabel.Size = UDim2.new(1, -10, 0, 20)
@@ -10925,8 +11578,6 @@ end
 -- Fortification UI
 ------------------------------------------------------------------------
 function OpenFortificationUI(slotName: string)
-	-- Simple prompt — in a full game this would be a proper UI
-	-- For now, just fire the fortify request with the first valid material in inventory
 	FortifyRequest:FireServer("install", slotName, 1)
 end
 
@@ -10934,11 +11585,7 @@ end
 -- Generator UI
 ------------------------------------------------------------------------
 function OpenGeneratorUI()
-	-- Simple prompt for refueling — in a full game, full UI panel
-	-- Find first fuel item in inventory and refuel
-	RefuelRequest:FireServer(1)  -- slot 1 as placeholder
-
-	-- Also allow upgrade
+	RefuelRequest:FireServer(1)
 	InteractRequest:FireServer("UpgradeGenerator")
 end
 
@@ -10982,6 +11629,18 @@ local function SetupPrompts()
 			prompt.Parent = part
 		end
 	end
+
+	-- Upgrade station
+	for _, part in ipairs(CollectionService:GetTagged("UpgradeStation")) do
+		if not part:FindFirstChildOfClass("ProximityPrompt") then
+			local prompt = Instance.new("ProximityPrompt")
+			prompt.ActionText = "Upgrade Base"
+			prompt.ObjectText = "Expand your home"
+			prompt.MaxActivationDistance = Config.Player.InteractRange
+			prompt.HoldDuration = 1.0
+			prompt.Parent = part
+		end
+	end
 end
 
 -- Run setup and listen for new objects
@@ -10996,13 +11655,16 @@ end)
 CollectionService:GetInstanceAddedSignal("CookingStation"):Connect(function()
 	task.defer(SetupPrompts)
 end)
+CollectionService:GetInstanceAddedSignal("UpgradeStation"):Connect(function()
+	task.defer(SetupPrompts)
+end)
 
 print("[InteractionController] Initialized")
 </ProtectedString>
           <bool name="Disabled">false</bool>
         </Properties>
       </Item>
-      <Item class="LocalScript" referent="RBX0000003E">
+      <Item class="LocalScript" referent="RBX00000040">
         <Properties>
           <string name="Name">LobbyUI</string>
           <ProtectedString name="Source">--[[
@@ -11271,17 +11933,17 @@ print("[LobbyUI] Initialized")
       </Item>
     </Item>
   </Item>
-  <Item class="ServerStorage" referent="RBX0000003F">
+  <Item class="ServerStorage" referent="RBX00000041">
     <Properties>
       <string name="Name">ServerStorage</string>
     </Properties>
   </Item>
-  <Item class="SoundService" referent="RBX00000040">
+  <Item class="SoundService" referent="RBX00000042">
     <Properties>
       <string name="Name">SoundService</string>
     </Properties>
   </Item>
-  <Item class="StarterGui" referent="RBX00000041">
+  <Item class="StarterGui" referent="RBX00000043">
     <Properties>
       <string name="Name">StarterGui</string>
     </Properties>

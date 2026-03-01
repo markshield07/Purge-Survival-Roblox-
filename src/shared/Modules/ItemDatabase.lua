@@ -925,6 +925,40 @@ ItemDatabase.Items = {
 	},
 
 	------------------------------------------------------------------------
+	-- Backpacks (upgrade inventory capacity)
+	------------------------------------------------------------------------
+	small_backpack = {
+		name = "Small Backpack",
+		category = Cat.Backpack,
+		tier = Tier.Uncommon,
+		description = "A durable school backpack. Holds 10 items.",
+		stackable = false,
+		maxStack = 1,
+		weight = 2,
+		backpackSlots = 10,
+	},
+	medium_backpack = {
+		name = "Hiking Backpack",
+		category = Cat.Backpack,
+		tier = Tier.Rare,
+		description = "Sturdy hiking backpack with multiple compartments. Holds 15 items.",
+		stackable = false,
+		maxStack = 1,
+		weight = 3,
+		backpackSlots = 15,
+	},
+	large_backpack = {
+		name = "Military Rucksack",
+		category = Cat.Backpack,
+		tier = Tier.Epic,
+		description = "Heavy-duty military rucksack. Holds 20 items.",
+		stackable = false,
+		maxStack = 1,
+		weight = 4,
+		backpackSlots = 20,
+	},
+
+	------------------------------------------------------------------------
 	-- Recipe Cards
 	------------------------------------------------------------------------
 	recipe_heated_beans = {
@@ -1010,6 +1044,7 @@ ItemDatabase.ZoneLoot = {
 		"spark_plugs", "wiring", "fan_belt",
 		"stove_parts", "recipe_roasted_rabbit", "recipe_fish_tacos",
 		"tomato_seed", "potato_seed",
+		"small_backpack",
 	},
 	[3] = {
 		"steel_panels", "bulletproof_glass", "industrial_lock", "steel_door",
@@ -1020,6 +1055,7 @@ ItemDatabase.ZoneLoot = {
 		"glow_stick",
 		"industrial_motor", "voltage_regulator", "heavy_fuel_tank", "solar_panel",
 		"kitchen_parts", "recipe_venison_stew", "recipe_power_meal",
+		"medium_backpack", "large_backpack",
 	},
 }
 

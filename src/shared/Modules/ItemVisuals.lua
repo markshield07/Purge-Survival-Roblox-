@@ -516,6 +516,30 @@ ItemVisuals.Items = {
 	},
 
 	------------------------------------------------------------------------
+	-- BACKPACKS
+	------------------------------------------------------------------------
+	small_backpack = {
+		shape = BLOCK,
+		size = Vector3.new(0.9, 1.0, 0.5),
+		color = Color3.fromRGB(60, 100, 60),
+		material = Enum.Material.Fabric,
+	},
+	medium_backpack = {
+		shape = BLOCK,
+		size = Vector3.new(1.0, 1.2, 0.6),
+		color = Color3.fromRGB(80, 60, 40),
+		material = Enum.Material.Fabric,
+		glow = Color3.fromRGB(0, 120, 255),
+	},
+	large_backpack = {
+		shape = BLOCK,
+		size = Vector3.new(1.1, 1.4, 0.7),
+		color = Color3.fromRGB(50, 60, 50),
+		material = Enum.Material.Fabric,
+		glow = Color3.fromRGB(180, 0, 255),
+	},
+
+	------------------------------------------------------------------------
 	-- SEEDS
 	------------------------------------------------------------------------
 	tomato_seed = {
@@ -677,6 +701,12 @@ ItemVisuals.CategoryDefaults = {
 		size = Vector3.new(0.6, 0.05, 0.4),
 		color = Color3.fromRGB(220, 210, 180),
 		material = Enum.Material.SmoothPlastic,
+	},
+	Backpack = {
+		shape = BLOCK,
+		size = Vector3.new(0.9, 1.0, 0.5),
+		color = Color3.fromRGB(70, 90, 60),
+		material = Enum.Material.Fabric,
 	},
 }
 

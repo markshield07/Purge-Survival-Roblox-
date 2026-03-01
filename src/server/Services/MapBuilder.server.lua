@@ -310,9 +310,11 @@ local function CreateHouseLot(baseCFrame: CFrame, zone: number, houseIndex: numb
 	local depths  = { 18, 22, 30 }
 	local heights = { 10, 12, 14 }
 
-	local w = isStarter and 22 or (widths[zone] or 22)
-	local d = isStarter and 18 or (depths[zone] or 18)
-	local h = isStarter and 10 or (heights[zone] or 10)
+	-- Starter house uses base expansion dimensions (level 1 = 28x22)
+	local starterDims = Config.BaseExpansion.Dimensions[1]
+	local w = isStarter and starterDims[1] or (widths[zone] or 22)
+	local d = isStarter and starterDims[2] or (depths[zone] or 18)
+	local h = isStarter and starterDims[3] or (heights[zone] or 10)
 
 	-- Lot dimensions
 	local lotWidth = w + 18  -- house + side gaps
@@ -914,6 +916,26 @@ local function CreateHouseLot(baseCFrame: CFrame, zone: number, houseIndex: numb
 			})
 		end
 
+		-- Upgrade Workbench (inside house, for base expansion)
+		CreatePart({
+			Name = "UpgradeWorkbench",
+			Size = Vector3.new(3, 2.5, 2),
+			CFrame = houseCF * CFrame.new(w / 3, 1.25, d / 4),
+			Material = Enum.Material.Wood,
+			Color = Color3.fromRGB(100, 75, 45),
+			Parent = houseFolder,
+			Tags = { "UpgradeStation" },
+		})
+		-- Workbench top
+		CreatePart({
+			Name = "WorkbenchTop",
+			Size = Vector3.new(3.2, 0.15, 2.2),
+			CFrame = houseCF * CFrame.new(w / 3, 2.58, d / 4),
+			Material = Enum.Material.Wood,
+			Color = Color3.fromRGB(120, 90, 55),
+			Parent = houseFolder,
+		})
+
 		-- Spawn point
 		CreatePart({
 			Name = "StarterHouseSpawn",
@@ -925,7 +947,7 @@ local function CreateHouseLot(baseCFrame: CFrame, zone: number, houseIndex: numb
 		})
 	end
 
-	return houseFolder
+	return houseFolder, houseCF
 end
 
 ------------------------------------------------------------------------
@@ -1276,6 +1298,109 @@ local function BuildMap()
 	print("  Streets:", #streets)
 	print("  Total houses (approx):", houseGlobalIndex)
 end
+
+------------------------------------------------------------------------
+-- Base Expansion: add rooms when base level increases
+------------------------------------------------------------------------
+local function ExpandBase(newLevel)
+	local starterHouse = MapFolder:FindFirstChild("StarterHouse")
+	if not starterHouse then return end
+
+	local dims = Config.BaseExpansion.Dimensions[newLevel]
+	if not dims then return end
+
+	local newW, newD, newH = dims[1], dims[2], dims[3]
+	local oldDims = Config.BaseExpansion.Dimensions[newLevel - 1]
+	local oldW, oldD = oldDims[1], oldDims[2]
+
+	-- Find the house CFrame from the foundation
+	local foundation = starterHouse:FindFirstChild("Foundation")
+	if not foundation then return end
+	local houseCF = foundation.CFrame * CFrame.new(0, -0.25, 0)
+
+	-- Add expansion room on the side of the house
+	local expansionSide = (newLevel % 2 == 0) and 1 or -1
+	local addedWidth = (newW - oldW)
+	local roomCF = houseCF * CFrame.new(expansionSide * (oldW / 2 + addedWidth / 2), 0, 0)
+
+	local levelNames = { [2] = "Storage Room", [3] = "Workshop", [4] = "Armory" }
+	local roomName = levelNames[newLevel] or "Expansion"
+
+	-- Room floor
+	CreatePart({
+		Name = roomName .. "_Floor",
+		Size = Vector3.new(addedWidth, 0.3, oldD * 0.8),
+		CFrame = roomCF * CFrame.new(0, 0.65, 0),
+		Material = Enum.Material.WoodPlanks,
+		Color = Color3.fromRGB(110, 85, 55),
+		Parent = starterHouse,
+	})
+
+	-- Room walls
+	-- Outer side wall
+	CreatePart({
+		Name = roomName .. "_WallOuter",
+		Size = Vector3.new(1, newH, oldD * 0.8),
+		CFrame = roomCF * CFrame.new(expansionSide * addedWidth / 2, newH / 2 + 0.5, 0),
+		Material = Enum.Material.Brick,
+		Color = Color3.fromRGB(130, 95, 70),
+		Parent = starterHouse,
+	})
+
+	-- Front wall
+	CreatePart({
+		Name = roomName .. "_WallFront",
+		Size = Vector3.new(addedWidth, newH, 1),
+		CFrame = roomCF * CFrame.new(0, newH / 2 + 0.5, -oldD * 0.4),
+		Material = Enum.Material.Brick,
+		Color = Color3.fromRGB(130, 95, 70),
+		Parent = starterHouse,
+	})
+
+	-- Back wall
+	CreatePart({
+		Name = roomName .. "_WallBack",
+		Size = Vector3.new(addedWidth, newH, 1),
+		CFrame = roomCF * CFrame.new(0, newH / 2 + 0.5, oldD * 0.4),
+		Material = Enum.Material.Brick,
+		Color = Color3.fromRGB(130, 95, 70),
+		Parent = starterHouse,
+	})
+
+	-- Room roof
+	CreatePart({
+		Name = roomName .. "_Roof",
+		Size = Vector3.new(addedWidth + 2, 0.6, oldD * 0.8 + 2),
+		CFrame = roomCF * CFrame.new(0, newH + 0.8, 0),
+		Material = Enum.Material.Slate,
+		Color = Color3.fromRGB(75, 55, 45),
+		Parent = starterHouse,
+	})
+
+	-- Loot container in the new room (table with items)
+	CreatePart({
+		Name = roomName .. "_Table",
+		Size = Vector3.new(3, 2, 2),
+		CFrame = roomCF * CFrame.new(0, 1, 0),
+		Material = Enum.Material.Wood,
+		Color = Color3.fromRGB(110, 80, 50),
+		Parent = starterHouse,
+		Tags = { "LootContainer" },
+		Attributes = { Zone = math.min(newLevel, 3), ContainerIndex = 10 + newLevel, FurnitureType = "Table" },
+	})
+
+	print("[MapBuilder] Base expanded to level " .. newLevel .. " — added " .. roomName)
+end
+
+-- Listen for expansion signal from GameManager
+task.defer(function()
+	local expandSignal = game.ServerStorage:WaitForChild("ExpandBaseSignal", 30)
+	if expandSignal then
+		expandSignal.Event:Connect(function(newLevel)
+			ExpandBase(newLevel)
+		end)
+	end
+end)
 
 ------------------------------------------------------------------------
 -- Build on startup

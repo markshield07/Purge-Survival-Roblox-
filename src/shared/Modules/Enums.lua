@@ -54,6 +54,7 @@ Enums.ItemCategory = {
 	Recipe = "Recipe",
 	Cosmetic = "Cosmetic",
 	Ammo = "Ammo",
+	Backpack = "Backpack",
 }
 
 -- Hunger levels

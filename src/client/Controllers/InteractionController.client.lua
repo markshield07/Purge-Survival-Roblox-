@@ -1,13 +1,15 @@
 --[[
 	InteractionController.client.lua
-	Handles proximity-based interactions: loot pickup, cooking stations,
-	generator interaction, fortification slots, and reviving teammates.
+	Handles proximity-based interactions: loot pickup (store in backpack),
+	cooking stations, generator interaction, fortification slots,
+	base upgrades, and reviving teammates.
 ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local CollectionService = game:GetService("CollectionService")
+local TweenService = game:GetService("TweenService")
 
 local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
@@ -27,6 +29,97 @@ local RefuelRequest = Remotes:WaitForChild("RefuelRequest")
 local ReviveRequest = Remotes:WaitForChild("ReviveRequest")
 local InteractRequest = Remotes:WaitForChild("InteractRequest")
 local UpdateHUD = Remotes:WaitForChild("UpdateHUD")
+local UpgradeBase = Remotes:WaitForChild("UpgradeBase")
+
+------------------------------------------------------------------------
+-- Pickup Popup (brief "Store in Backpack" confirmation)
+------------------------------------------------------------------------
+local PickupPopup = nil
+
+local function ShowPickupPopup(lootPart)
+	if PickupPopup then PickupPopup:Destroy() end
+
+	local itemId = lootPart:GetAttribute("ItemId")
+	local quantity = lootPart:GetAttribute("Quantity") or 1
+	if not itemId then return end
+
+	local itemData = ItemDatabase.GetItem(itemId)
+	if not itemData then return end
+
+	local tierColor = Enums.TierColor[itemData.tier] or Color3.new(1, 1, 1)
+
+	PickupPopup = Instance.new("ScreenGui")
+	PickupPopup.Name = "PickupPopup"
+	PickupPopup.Parent = PlayerGui
+
+	local frame = Instance.new("Frame")
+	frame.Name = "PopupFrame"
+	frame.Size = UDim2.new(0, 280, 0, 100)
+	frame.Position = UDim2.new(0.5, 0, 0.65, 0)
+	frame.AnchorPoint = Vector2.new(0.5, 0.5)
+	frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+	frame.BackgroundTransparency = 0.15
+	frame.BorderSizePixel = 0
+	frame.Parent = PickupPopup
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 8)
+	corner.Parent = frame
+
+	-- Item name
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Size = UDim2.new(1, -10, 0, 24)
+	nameLabel.Position = UDim2.new(0, 5, 0, 5)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Text = itemData.name .. (quantity > 1 and (" x" .. quantity) or "")
+	nameLabel.TextColor3 = tierColor
+	nameLabel.TextScaled = true
+	nameLabel.Font = Enum.Font.GothamBold
+	nameLabel.Parent = frame
+
+	-- Tier label
+	local tierLabel = Instance.new("TextLabel")
+	tierLabel.Size = UDim2.new(1, -10, 0, 16)
+	tierLabel.Position = UDim2.new(0, 5, 0, 28)
+	tierLabel.BackgroundTransparency = 1
+	tierLabel.Text = itemData.tier .. " " .. itemData.category
+	tierLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+	tierLabel.TextScaled = true
+	tierLabel.Font = Enum.Font.Gotham
+	tierLabel.Parent = frame
+
+	-- "Store in Backpack" button
+	local storeBtn = Instance.new("TextButton")
+	storeBtn.Size = UDim2.new(0.9, 0, 0, 32)
+	storeBtn.Position = UDim2.new(0.05, 0, 1, -40)
+	storeBtn.BackgroundColor3 = Color3.fromRGB(40, 80, 40)
+	storeBtn.Text = "Store in Backpack"
+	storeBtn.TextColor3 = Color3.fromRGB(200, 255, 200)
+	storeBtn.TextScaled = true
+	storeBtn.Font = Enum.Font.GothamBold
+	storeBtn.BorderSizePixel = 0
+	storeBtn.Parent = frame
+
+	local btnCorner = Instance.new("UICorner")
+	btnCorner.CornerRadius = UDim.new(0, 6)
+	btnCorner.Parent = storeBtn
+
+	storeBtn.MouseButton1Click:Connect(function()
+		PickupItem:FireServer(lootPart)
+		if PickupPopup then
+			PickupPopup:Destroy()
+			PickupPopup = nil
+		end
+	end)
+
+	-- Auto-dismiss after 5 seconds
+	task.delay(5, function()
+		if PickupPopup then
+			PickupPopup:Destroy()
+			PickupPopup = nil
+		end
+	end)
+end
 
 ------------------------------------------------------------------------
 -- Proximity Prompt Handler
@@ -37,9 +130,9 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
 	local part = prompt.Parent
 	if not part then return end
 
-	-- Loot Item Pickup
+	-- Loot Item Pickup — show "Store in Backpack" popup
 	if CollectionService:HasTag(part, "LootItem") then
-		PickupItem:FireServer(part)
+		ShowPickupPopup(part)
 		return
 	end
 
@@ -49,12 +142,9 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
 		local built = part:GetAttribute("Built")
 
 		if not built then
-			-- Prompt to build
-			-- TODO: Show build UI
 			return
 		end
 
-		-- Request recipe list from server
 		CookRequest:FireServer("GetRecipes", stationType)
 		OpenCookingUI(stationType, part)
 		return
@@ -62,7 +152,6 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
 
 	-- Fortification Slot (only allow on your own StarterHouse)
 	if CollectionService:HasTag(part, "FortSlot") then
-		-- Check if this slot is inside the StarterHouse
 		local isOwnBase = false
 		local parent = part.Parent
 		while parent do
@@ -74,9 +163,6 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
 		end
 
 		if not isOwnBase then
-			-- Notify player they can't fortify other houses
-			local NotifyPlayers = Remotes:FindFirstChild("NotifyPlayers")
-			-- Just show a local message since we can't fire server events to ourselves
 			return
 		end
 
@@ -90,6 +176,12 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
 	-- Generator
 	if CollectionService:HasTag(part, "Generator") then
 		OpenGeneratorUI()
+		return
+	end
+
+	-- Base Upgrade Workbench
+	if CollectionService:HasTag(part, "UpgradeStation") then
+		UpgradeBase:FireServer()
 		return
 	end
 
@@ -190,9 +282,9 @@ function OpenCookingUI(stationType: string, stationPart: BasePart)
 			recipeBtn.AutoButtonColor = recipe.canCook
 			recipeBtn.Parent = scrollFrame
 
-			local btnCorner = Instance.new("UICorner")
-			btnCorner.CornerRadius = UDim.new(0, 6)
-			btnCorner.Parent = recipeBtn
+			local btnCorner2 = Instance.new("UICorner")
+			btnCorner2.CornerRadius = UDim.new(0, 6)
+			btnCorner2.Parent = recipeBtn
 
 			local nameLabel = Instance.new("TextLabel")
 			nameLabel.Size = UDim2.new(1, -10, 0, 20)
@@ -254,8 +346,6 @@ end
 -- Fortification UI
 ------------------------------------------------------------------------
 function OpenFortificationUI(slotName: string)
-	-- Simple prompt — in a full game this would be a proper UI
-	-- For now, just fire the fortify request with the first valid material in inventory
 	FortifyRequest:FireServer("install", slotName, 1)
 end
 
@@ -263,11 +353,7 @@ end
 -- Generator UI
 ------------------------------------------------------------------------
 function OpenGeneratorUI()
-	-- Simple prompt for refueling — in a full game, full UI panel
-	-- Find first fuel item in inventory and refuel
-	RefuelRequest:FireServer(1)  -- slot 1 as placeholder
-
-	-- Also allow upgrade
+	RefuelRequest:FireServer(1)
 	InteractRequest:FireServer("UpgradeGenerator")
 end
 
@@ -311,6 +397,18 @@ local function SetupPrompts()
 			prompt.Parent = part
 		end
 	end
+
+	-- Upgrade station
+	for _, part in ipairs(CollectionService:GetTagged("UpgradeStation")) do
+		if not part:FindFirstChildOfClass("ProximityPrompt") then
+			local prompt = Instance.new("ProximityPrompt")
+			prompt.ActionText = "Upgrade Base"
+			prompt.ObjectText = "Expand your home"
+			prompt.MaxActivationDistance = Config.Player.InteractRange
+			prompt.HoldDuration = 1.0
+			prompt.Parent = part
+		end
+	end
 end
 
 -- Run setup and listen for new objects
@@ -323,6 +421,9 @@ CollectionService:GetInstanceAddedSignal("Generator"):Connect(function()
 	task.defer(SetupPrompts)
 end)
 CollectionService:GetInstanceAddedSignal("CookingStation"):Connect(function()
+	task.defer(SetupPrompts)
+end)
+CollectionService:GetInstanceAddedSignal("UpgradeStation"):Connect(function()
 	task.defer(SetupPrompts)
 end)
 

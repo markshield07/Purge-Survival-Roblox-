@@ -51,6 +51,8 @@ local FortifyRequest = CreateRemote("FortifyRequest", "RemoteEvent")
 local RefuelRequest = CreateRemote("RefuelRequest", "RemoteEvent")
 local ReviveRequest = CreateRemote("ReviveRequest", "RemoteEvent")
 local CraftRequest = CreateRemote("CraftRequest", "RemoteEvent")
+local EquipItem = CreateRemote("EquipItem", "RemoteEvent")
+local UpgradeBase = CreateRemote("UpgradeBase", "RemoteEvent")
 
 -- Data remotes
 local RequestInventory = CreateRemote("RequestInventory", "RemoteFunction")
@@ -75,6 +77,7 @@ local GameState = {
 		fortifications = {},  -- [slotName] = { materialId, durability, maxDurability }
 		cookingStations = {},  -- [stationType] = true/false
 		gardenPlots = {},     -- { seedId, plantedDay, grown }
+		baseLevel = 1,        -- expansion level (1-4)
 	},
 
 	-- Generator state
@@ -108,7 +111,8 @@ local function InitPlayerState(player: Player)
 		stamina = 100,
 		state = Enums.PlayerState.Alive,
 		inventory = {},  -- { { itemId, quantity } }
-		maxSlots = Config.Player.MaxInventorySlots,
+		maxSlots = Config.Player.MaxInventorySlots,  -- 5 by default
+		equippedWeapon = "baseball_bat",  -- equipped weapon (separate from backpack)
 		knownRecipes = {},
 		buffs = {},  -- { { type, amount, expiresAt } }
 		isSprinting = false,
@@ -118,14 +122,6 @@ local function InitPlayerState(player: Player)
 		scrap = 0,
 		purgeCoins = 0,
 	}
-
-	-- Starter weapon: Baseball Bat so players can defend themselves
-	table.insert(PlayerStates[player].inventory, {
-		itemId = "baseball_bat",
-		quantity = 1,
-		spoilDay = -1,
-		pickedUpDay = 0,
-	})
 
 	-- Add starter recipes
 	local RecipeDB = require(Modules.RecipeDatabase)
@@ -560,7 +556,11 @@ end
 RequestInventory.OnServerInvoke = function(player)
 	local state = PlayerStates[player]
 	if not state then return {} end
-	return state.inventory
+	return {
+		inventory = state.inventory,
+		maxSlots = state.maxSlots,
+		equippedWeapon = state.equippedWeapon,
+	}
 end
 
 -- Refuel generator
@@ -829,5 +829,178 @@ GetFortSlotBF.OnInvoke = function(slotName)
 	if not GameState.house or not GameState.house.fortifications then return nil end
 	return GameState.house.fortifications[slotName]
 end
+
+------------------------------------------------------------------------
+-- Equip / Unequip Weapon
+------------------------------------------------------------------------
+EquipItem.OnServerEvent:Connect(function(player, slotIndex)
+	local state = PlayerStates[player]
+	if not state then return end
+
+	if slotIndex == nil or slotIndex == 0 then
+		-- Unequip current weapon back to inventory
+		if state.equippedWeapon then
+			local ItemDB = require(Modules.ItemDatabase)
+			local weaponData = ItemDB.GetItem(state.equippedWeapon)
+			if weaponData then
+				-- Try to add back to inventory
+				if #state.inventory < state.maxSlots then
+					table.insert(state.inventory, {
+						itemId = state.equippedWeapon,
+						quantity = 1,
+						spoilDay = -1,
+						pickedUpDay = GameState.currentDay,
+					})
+				else
+					NotifyPlayers:FireClient(player, "Backpack full! Can't unequip.", Color3.fromRGB(255, 100, 100))
+					return
+				end
+			end
+			state.equippedWeapon = nil
+			UpdateHUD:FireClient(player, "EquippedWeapon", nil)
+			UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
+		end
+		return
+	end
+
+	local slot = state.inventory[slotIndex]
+	if not slot then return end
+
+	local ItemDB = require(Modules.ItemDatabase)
+	local itemData = ItemDB.GetItem(slot.itemId)
+	if not itemData or itemData.category ~= Enums.ItemCategory.Weapon then
+		NotifyPlayers:FireClient(player, "Can only equip weapons!", Color3.fromRGB(255, 100, 100))
+		return
+	end
+
+	-- If already have a weapon equipped, swap it back to inventory
+	if state.equippedWeapon then
+		local oldWeapon = state.equippedWeapon
+		state.equippedWeapon = slot.itemId
+		-- Replace the inventory slot with the old weapon
+		slot.itemId = oldWeapon
+		slot.quantity = 1
+		slot.spoilDay = -1
+	else
+		-- Equip from inventory, remove from backpack
+		state.equippedWeapon = slot.itemId
+		table.remove(state.inventory, slotIndex)
+	end
+
+	UpdateHUD:FireClient(player, "EquippedWeapon", state.equippedWeapon)
+	UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
+	NotifyPlayers:FireClient(player, "Equipped " .. itemData.name, Color3.fromRGB(100, 200, 255))
+end)
+
+------------------------------------------------------------------------
+-- Backpack Upgrade (called by InventoryService when a backpack is picked up)
+------------------------------------------------------------------------
+local UpgradeBackpackBF = Instance.new("BindableFunction")
+UpgradeBackpackBF.Name = "UpgradeBackpack"
+UpgradeBackpackBF.Parent = game.ServerStorage
+UpgradeBackpackBF.OnInvoke = function(player, newMaxSlots)
+	local state = PlayerStates[player]
+	if not state then return false end
+
+	if newMaxSlots > state.maxSlots then
+		state.maxSlots = newMaxSlots
+		UpdateHUD:FireClient(player, "BackpackUpgrade", state.maxSlots)
+		return true
+	end
+	return false
+end
+
+------------------------------------------------------------------------
+-- Base Expansion
+------------------------------------------------------------------------
+UpgradeBase.OnServerEvent:Connect(function(player)
+	local state = PlayerStates[player]
+	if not state then return end
+
+	-- Check player is at their base
+	local char = player.Character
+	if not char then return end
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+
+	-- Find starter house
+	local starterHouse = MapFolder and MapFolder:FindFirstChild("StarterHouse")
+	if not starterHouse then
+		local mapFolder = workspace:FindFirstChild("Map")
+		if mapFolder then
+			starterHouse = mapFolder:FindFirstChild("StarterHouse")
+		end
+	end
+	if not starterHouse then
+		NotifyPlayers:FireClient(player, "Can't find your base!", Color3.fromRGB(255, 100, 100))
+		return
+	end
+
+	local currentLevel = GameState.house.baseLevel
+	if currentLevel >= Config.BaseExpansion.MaxLevel then
+		NotifyPlayers:FireClient(player, "Base is fully upgraded!", Color3.fromRGB(255, 200, 50))
+		return
+	end
+
+	local nextLevel = currentLevel + 1
+	local costs = Config.BaseExpansion.Costs[nextLevel]
+	if not costs then return end
+
+	-- Check if player has all required materials
+	local ItemDB = require(Modules.ItemDatabase)
+	for itemId, needed in pairs(costs) do
+		local count = 0
+		for _, slot in ipairs(state.inventory) do
+			if slot.itemId == itemId then
+				count = count + slot.quantity
+			end
+		end
+		if count < needed then
+			local itemData = ItemDB.GetItem(itemId)
+			local name = itemData and itemData.name or itemId
+			NotifyPlayers:FireClient(player,
+				"Need " .. needed .. "x " .. name .. " (have " .. count .. ")",
+				Color3.fromRGB(255, 100, 100))
+			return
+		end
+	end
+
+	-- Consume materials
+	for itemId, needed in pairs(costs) do
+		local remaining = needed
+		for i = #state.inventory, 1, -1 do
+			local slot = state.inventory[i]
+			if slot.itemId == itemId then
+				local take = math.min(remaining, slot.quantity)
+				slot.quantity = slot.quantity - take
+				remaining = remaining - take
+				if slot.quantity <= 0 then
+					table.remove(state.inventory, i)
+				end
+				if remaining <= 0 then break end
+			end
+		end
+	end
+
+	-- Upgrade base level
+	GameState.house.baseLevel = nextLevel
+
+	-- Signal MapBuilder to expand the house
+	local expandSignal = game.ServerStorage:FindFirstChild("ExpandBaseSignal")
+	if expandSignal then
+		expandSignal:Fire(nextLevel)
+	end
+
+	UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
+	NotifyPlayers:FireAllClients(
+		"Base upgraded to Level " .. nextLevel .. "!",
+		Color3.fromRGB(0, 255, 100))
+	UpdateHUD:FireAllClients("BaseLevel", nextLevel)
+end)
+
+-- Create expand signal for MapBuilder
+local expandSignal = Instance.new("BindableEvent")
+expandSignal.Name = "ExpandBaseSignal"
+expandSignal.Parent = game.ServerStorage
 
 print("[GameManager] Initialized - The Purge: Suburban Survival")

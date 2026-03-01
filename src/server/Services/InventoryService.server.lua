@@ -224,15 +224,40 @@ PickupItem.OnServerEvent:Connect(function(player, lootInstance)
 	local quantity = lootInstance:GetAttribute("Quantity") or 1
 	if not itemId then return end
 
-	-- Add to inventory
+	local itemData = ItemDatabase.GetItem(itemId)
+	if not itemData then return end
+
+	-- Backpack pickup: auto-upgrade inventory capacity
+	if itemData.category == Enums.ItemCategory.Backpack then
+		local backpackSlots = itemData.backpackSlots or 10
+		local upgrader = game.ServerStorage:FindFirstChild("UpgradeBackpack")
+		if upgrader then
+			local upgraded = upgrader:Invoke(player, backpackSlots)
+			if upgraded then
+				lootInstance:Destroy()
+				NotifyPlayers:FireClient(player,
+					"Found " .. itemData.name .. "! Backpack upgraded to " .. backpackSlots .. " slots!",
+					Color3.fromRGB(50, 255, 100))
+			else
+				NotifyPlayers:FireClient(player,
+					"Already have a better backpack!",
+					Color3.fromRGB(255, 200, 50))
+			end
+		end
+		return
+	end
+
+	-- Add to inventory (backpack)
 	if InventoryService.AddItem(player, itemId, quantity) then
 		-- Remove from world
 		lootInstance:Destroy()
 
-		local itemData = ItemDatabase.GetItem(itemId)
-		local name = itemData and itemData.name or itemId
+		local name = itemData.name or itemId
+		local state = GetPlayerState(player)
+		local slotCount = state and #state.inventory or 0
+		local maxSlots = state and state.maxSlots or Config.Player.MaxInventorySlots
 		NotifyPlayers:FireClient(player,
-			"Picked up " .. name .. (quantity > 1 and (" x" .. quantity) or ""),
+			name .. (quantity > 1 and (" x" .. quantity) or "") .. " stored in backpack [" .. slotCount .. "/" .. maxSlots .. "]",
 			Color3.fromRGB(200, 200, 255)
 		)
 	end

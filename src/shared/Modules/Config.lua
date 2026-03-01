@@ -27,10 +27,38 @@ Config.Player = {
 	BaseSprintSpeed = 24,
 	DownedCrawlSpeed = 4,
 	ReviveTimeSeconds = 5,
-	MaxInventorySlots = 15,
-	MaxInventorySlotsVIP = 20,
+	MaxInventorySlots = 5,      -- default backpack holds 5 items
+	MaxInventorySlotsVIP = 8,   -- VIP gets a slightly bigger starter pack
 	InteractRange = 8,
 	PickupRange = 6,
+}
+
+-- Backpack capacity tiers (found as loot to upgrade inventory size)
+Config.Backpack = {
+	Default = 5,            -- starter sack
+	SmallBackpack = 10,
+	MediumBackpack = 15,
+	LargeBackpack = 20,
+}
+
+-- Base expansion: costs and dimensions per level
+Config.BaseExpansion = {
+	MaxLevel = 4,
+	Dimensions = {
+		-- { width, depth, height }
+		[1] = { 28, 22, 10 },  -- starter
+		[2] = { 34, 26, 11 },  -- first expansion
+		[3] = { 40, 30, 12 },  -- second expansion
+		[4] = { 48, 36, 14 },  -- full mansion
+	},
+	Costs = {
+		-- level 1 → 2
+		[2] = { plywood = 5, nails = 10, wooden_planks = 3 },
+		-- level 2 → 3
+		[3] = { reinforced_boards = 5, steel_nails = 5, sandbags = 3 },
+		-- level 3 → 4
+		[4] = { steel_panels = 3, industrial_lock = 2, steel_door = 1 },
+	},
 }
 
 ------------------------------------------------------------------------
