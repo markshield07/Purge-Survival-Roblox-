@@ -665,26 +665,152 @@ local function CreateHouseLot(baseCFrame: CFrame, zone: number, houseIndex: numb
 	end
 
 	--------------------------------------------------------------------
-	-- LOOT CONTAINERS
+	-- INTERIOR FURNITURE (acts as loot containers)
 	--------------------------------------------------------------------
-	local lootContainerCount = zone == 1 and 2 or (zone == 2 and 3 or 4)
-	for i = 1, lootContainerCount do
-		local lootOffset = CFrame.new(
-			math.random(-w / 3, w / 3),
-			1.5,
-			math.random(-d / 3, d / 3)
-		)
+	local containerIdx = 0
+
+	-- Kitchen counter (back-left corner)
+	containerIdx = containerIdx + 1
+	CreatePart({
+		Name = "KitchenCounter",
+		Size = Vector3.new(w * 0.35, 2.5, 1.5),
+		CFrame = houseCF * CFrame.new(-w / 3, 1.25, d / 2 - 1.5),
+		Material = Enum.Material.Granite,
+		Color = Color3.fromRGB(160, 155, 148),
+		Parent = houseFolder,
+	})
+	-- Counter top surface (where items sit)
+	CreatePart({
+		Name = "CounterTop",
+		Size = Vector3.new(w * 0.35, 0.15, 1.5),
+		CFrame = houseCF * CFrame.new(-w / 3, 2.6, d / 2 - 1.5),
+		Material = Enum.Material.Marble,
+		Color = Color3.fromRGB(200, 195, 185),
+		Parent = houseFolder,
+		Tags = { "LootContainer" },
+		Attributes = { Zone = zone, ContainerIndex = containerIdx, FurnitureType = "Counter" },
+	})
+
+	-- Wall shelf on left wall
+	containerIdx = containerIdx + 1
+	CreatePart({
+		Name = "WallShelf_L",
+		Size = Vector3.new(0.6, 0.2, w * 0.25),
+		CFrame = houseCF * CFrame.new(-w / 2 + 0.8, 3.5, -d / 6),
+		Material = Enum.Material.Wood,
+		Color = Color3.fromRGB(130, 95, 60),
+		Parent = houseFolder,
+		Tags = { "LootContainer" },
+		Attributes = { Zone = zone, ContainerIndex = containerIdx, FurnitureType = "Shelf" },
+	})
+	-- Shelf brackets
+	for _, bOff in ipairs({ -1, 1 }) do
 		CreatePart({
-			Name = "LootContainer_" .. i,
-			Size = Vector3.new(3, 2, 2),
-			CFrame = houseCF * lootOffset,
-			Material = Enum.Material.WoodPlanks,
-			Color = Color3.fromRGB(90, 70, 50),
+			Name = "ShelfBracket",
+			Size = Vector3.new(0.1, 0.5, 0.15),
+			CFrame = houseCF * CFrame.new(-w / 2 + 0.8, 3.25, -d / 6 + bOff * (w * 0.1)),
+			Material = Enum.Material.Metal,
+			Color = Color3.fromRGB(80, 80, 85),
 			Parent = houseFolder,
-			Tags = { "LootContainer" },
-			Attributes = { Zone = zone, ContainerIndex = i },
 		})
 	end
+
+	-- Living room table (center of house)
+	containerIdx = containerIdx + 1
+	CreatePart({
+		Name = "TableTop",
+		Size = Vector3.new(3.5, 0.2, 2),
+		CFrame = houseCF * CFrame.new(w / 6, 2.2, 0),
+		Material = Enum.Material.Wood,
+		Color = Color3.fromRGB(120, 85, 50),
+		Parent = houseFolder,
+		Tags = { "LootContainer" },
+		Attributes = { Zone = zone, ContainerIndex = containerIdx, FurnitureType = "Table" },
+	})
+	-- Table legs
+	for _, lx in ipairs({ -1.4, 1.4 }) do
+		for _, lz in ipairs({ -0.7, 0.7 }) do
+			CreatePart({
+				Name = "TableLeg",
+				Size = Vector3.new(0.25, 2, 0.25),
+				CFrame = houseCF * CFrame.new(w / 6 + lx, 1, lz),
+				Material = Enum.Material.Wood,
+				Color = Color3.fromRGB(110, 75, 45),
+				Parent = houseFolder,
+			})
+		end
+	end
+
+	-- Wall shelf on right wall (Zone 2-3 get more furniture)
+	if zone >= 2 then
+		containerIdx = containerIdx + 1
+		CreatePart({
+			Name = "WallShelf_R",
+			Size = Vector3.new(0.6, 0.2, w * 0.25),
+			CFrame = houseCF * CFrame.new(w / 2 - 0.8, 4, d / 6),
+			Material = Enum.Material.Wood,
+			Color = Color3.fromRGB(130, 95, 60),
+			Parent = houseFolder,
+			Tags = { "LootContainer" },
+			Attributes = { Zone = zone, ContainerIndex = containerIdx, FurnitureType = "Shelf" },
+		})
+	end
+
+	-- Bookshelf (Zone 3 gets a tall bookshelf)
+	if zone >= 3 then
+		containerIdx = containerIdx + 1
+		CreatePart({
+			Name = "Bookshelf",
+			Size = Vector3.new(2.5, 5, 1),
+			CFrame = houseCF * CFrame.new(w / 3, 2.5, d / 2 - 1),
+			Material = Enum.Material.Wood,
+			Color = Color3.fromRGB(90, 60, 35),
+			Parent = houseFolder,
+		})
+		-- Shelf surfaces inside bookshelf
+		for shelfY = 1.5, 4.5, 1.5 do
+			CreatePart({
+				Name = "BookshelfShelf_" .. math.floor(shelfY),
+				Size = Vector3.new(2.3, 0.15, 0.8),
+				CFrame = houseCF * CFrame.new(w / 3, shelfY, d / 2 - 1),
+				Material = Enum.Material.Wood,
+				Color = Color3.fromRGB(100, 70, 40),
+				Parent = houseFolder,
+			})
+		end
+		-- Top shelf is the loot container
+		CreatePart({
+			Name = "BookshelfLoot",
+			Size = Vector3.new(2.3, 0.15, 0.8),
+			CFrame = houseCF * CFrame.new(w / 3, 3, d / 2 - 1),
+			Material = Enum.Material.Wood,
+			Color = Color3.fromRGB(100, 70, 40),
+			Parent = houseFolder,
+			Tags = { "LootContainer" },
+			Attributes = { Zone = zone, ContainerIndex = containerIdx, FurnitureType = "Bookshelf" },
+		})
+	end
+
+	-- Nightstand (small side table in all houses)
+	containerIdx = containerIdx + 1
+	CreatePart({
+		Name = "Nightstand",
+		Size = Vector3.new(1.2, 1.5, 1),
+		CFrame = houseCF * CFrame.new(w / 3, 0.75, -d / 3),
+		Material = Enum.Material.Wood,
+		Color = Color3.fromRGB(100, 70, 45),
+		Parent = houseFolder,
+	})
+	CreatePart({
+		Name = "NightstandTop",
+		Size = Vector3.new(1.3, 0.1, 1.1),
+		CFrame = houseCF * CFrame.new(w / 3, 1.55, -d / 3),
+		Material = Enum.Material.Wood,
+		Color = Color3.fromRGB(110, 80, 50),
+		Parent = houseFolder,
+		Tags = { "LootContainer" },
+		Attributes = { Zone = zone, ContainerIndex = containerIdx, FurnitureType = "Nightstand" },
+	})
 
 	-- Tag the house
 	if not isStarter then

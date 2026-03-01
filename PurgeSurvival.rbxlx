@@ -23,37 +23,43 @@
         <bool name="Locked">true</bool>
       </Properties>
     </Item>
-    <Item class="Folder" referent="RBX00000005">
+    <Item class="Folder" referent="RBX00000006">
       <Properties>
         <string name="Name">Map</string>
       </Properties>
     </Item>
-    <Item class="Folder" referent="RBX00000006">
+
+    <Item class="Folder" referent="RBX00000007">
       <Properties>
         <string name="Name">NPCs</string>
       </Properties>
     </Item>
-    <Item class="Folder" referent="RBX00000007">
+
+    <Item class="Folder" referent="RBX00000008">
       <Properties>
         <string name="Name">Wildlife</string>
       </Properties>
     </Item>
-    <Item class="Folder" referent="RBX00000008">
+
+    <Item class="Folder" referent="RBX00000009">
       <Properties>
         <string name="Name">PurgeEnemies</string>
       </Properties>
     </Item>
-    <Item class="Folder" referent="RBX00000009">
+
+    <Item class="Folder" referent="RBX0000000A">
       <Properties>
         <string name="Name">LootItems</string>
       </Properties>
     </Item>
-    <Item class="Folder" referent="RBX0000000A">
+
+    <Item class="Folder" referent="RBX0000000B">
       <Properties>
         <string name="Name">SpawnPoints</string>
       </Properties>
     </Item>
-    <Item class="SpawnLocation" referent="RBX0000000B">
+
+    <Item class="SpawnLocation" referent="RBX00000005">
       <Properties>
         <string name="Name">SpawnLocation</string>
         <bool name="Anchored">true</bool>
@@ -1964,114 +1970,825 @@ return Utils
             <bool name="Disabled">false</bool>
           </Properties>
         </Item>
+        <Item class="ModuleScript" referent="RBX00000015">
+          <Properties>
+            <string name="Name">ItemVisuals</string>
+            <ProtectedString name="Source">--[[
+	ItemVisuals.lua
+	Defines visual appearance for every item so loot looks like
+	what it actually is (canned food, weapons, tools, etc.)
+	instead of generic colored cubes.
+]]
+
+local ItemVisuals = {}
+
+-- Shape constants (maps to Enum.PartType)
+local BLOCK = "Block"
+local CYLINDER = "Cylinder"
+local BALL = "Ball"
+
+------------------------------------------------------------------------
+-- Per-item visual definitions
+-- shape: Part shape (Block, Cylinder, Ball)
+-- size: Vector3 dimensions
+-- color: Color3 appearance
+-- material: Enum.Material
+-- glow: optional, adds PointLight for rare/special items
+------------------------------------------------------------------------
+ItemVisuals.Items = {
+	------------------------------------------------------------------------
+	-- FOOD - Canned / Packaged
+	------------------------------------------------------------------------
+	canned_beans = {
+		shape = CYLINDER,
+		size = Vector3.new(0.8, 0.8, 0.8),
+		color = Color3.fromRGB(50, 100, 60),
+		material = Enum.Material.Metal,
+		label = "Beans",
+	},
+	stale_bread = {
+		shape = BLOCK,
+		size = Vector3.new(1.2, 0.5, 0.6),
+		color = Color3.fromRGB(180, 150, 90),
+		material = Enum.Material.Fabric,
+	},
+	crackers = {
+		shape = BLOCK,
+		size = Vector3.new(0.8, 1.0, 0.3),
+		color = Color3.fromRGB(200, 170, 100),
+		material = Enum.Material.Cardboard,
+	},
+	bottled_water = {
+		shape = CYLINDER,
+		size = Vector3.new(0.5, 1.2, 0.5),
+		color = Color3.fromRGB(100, 160, 220),
+		material = Enum.Material.Glass,
+		transparency = 0.3,
+	},
+	mre = {
+		shape = BLOCK,
+		size = Vector3.new(1.0, 0.6, 0.8),
+		color = Color3.fromRGB(90, 85, 70),
+		material = Enum.Material.Fabric,
+	},
+	energy_drink = {
+		shape = CYLINDER,
+		size = Vector3.new(0.4, 1.0, 0.4),
+		color = Color3.fromRGB(0, 200, 100),
+		material = Enum.Material.Metal,
+		glow = Color3.fromRGB(0, 255, 100),
+	},
+
+	------------------------------------------------------------------------
+	-- FOOD - Raw Meats
+	------------------------------------------------------------------------
+	raw_rabbit = {
+		shape = BLOCK,
+		size = Vector3.new(0.8, 0.3, 0.6),
+		color = Color3.fromRGB(190, 120, 110),
+		material = Enum.Material.SmoothPlastic,
+	},
+	raw_fish = {
+		shape = BLOCK,
+		size = Vector3.new(1.2, 0.3, 0.5),
+		color = Color3.fromRGB(140, 160, 180),
+		material = Enum.Material.SmoothPlastic,
+	},
+	raw_bird = {
+		shape = BLOCK,
+		size = Vector3.new(0.7, 0.4, 0.5),
+		color = Color3.fromRGB(200, 150, 130),
+		material = Enum.Material.SmoothPlastic,
+	},
+	raw_venison = {
+		shape = BLOCK,
+		size = Vector3.new(1.0, 0.4, 0.7),
+		color = Color3.fromRGB(160, 60, 50),
+		material = Enum.Material.SmoothPlastic,
+	},
+	raw_meat = {
+		shape = BLOCK,
+		size = Vector3.new(0.9, 0.3, 0.6),
+		color = Color3.fromRGB(180, 70, 60),
+		material = Enum.Material.SmoothPlastic,
+	},
+
+	------------------------------------------------------------------------
+	-- FOOD - Produce / Ingredients
+	------------------------------------------------------------------------
+	vegetables = {
+		shape = BALL,
+		size = Vector3.new(0.6, 0.6, 0.6),
+		color = Color3.fromRGB(50, 140, 40),
+		material = Enum.Material.Grass,
+	},
+	herbs = {
+		shape = BLOCK,
+		size = Vector3.new(0.5, 0.6, 0.4),
+		color = Color3.fromRGB(40, 120, 35),
+		material = Enum.Material.LeafyGrass,
+	},
+	potato = {
+		shape = BALL,
+		size = Vector3.new(0.6, 0.5, 0.6),
+		color = Color3.fromRGB(160, 130, 80),
+		material = Enum.Material.Sand,
+	},
+	carrot = {
+		shape = BLOCK,
+		size = Vector3.new(0.2, 0.8, 0.2),
+		color = Color3.fromRGB(230, 120, 30),
+		material = Enum.Material.SmoothPlastic,
+	},
+	flour = {
+		shape = BLOCK,
+		size = Vector3.new(0.7, 0.9, 0.4),
+		color = Color3.fromRGB(240, 235, 220),
+		material = Enum.Material.Fabric,
+	},
+	spices = {
+		shape = CYLINDER,
+		size = Vector3.new(0.3, 0.6, 0.3),
+		color = Color3.fromRGB(150, 60, 20),
+		material = Enum.Material.Glass,
+	},
+	exotic_spices = {
+		shape = CYLINDER,
+		size = Vector3.new(0.3, 0.6, 0.3),
+		color = Color3.fromRGB(200, 50, 180),
+		material = Enum.Material.Glass,
+		glow = Color3.fromRGB(200, 50, 180),
+	},
+	cooking_oil = {
+		shape = CYLINDER,
+		size = Vector3.new(0.5, 1.0, 0.5),
+		color = Color3.fromRGB(220, 190, 60),
+		material = Enum.Material.Glass,
+		transparency = 0.2,
+	},
+
+	------------------------------------------------------------------------
+	-- FOOD - Cooked
+	------------------------------------------------------------------------
+	heated_beans = {
+		shape = CYLINDER,
+		size = Vector3.new(0.8, 0.6, 0.8),
+		color = Color3.fromRGB(140, 80, 40),
+		material = Enum.Material.SmoothPlastic,
+	},
+	roasted_rabbit = {
+		shape = BLOCK,
+		size = Vector3.new(0.9, 0.4, 0.7),
+		color = Color3.fromRGB(120, 70, 30),
+		material = Enum.Material.SmoothPlastic,
+	},
+	venison_stew = {
+		shape = CYLINDER,
+		size = Vector3.new(0.9, 0.6, 0.9),
+		color = Color3.fromRGB(100, 60, 30),
+		material = Enum.Material.SmoothPlastic,
+	},
+	fish_tacos = {
+		shape = BLOCK,
+		size = Vector3.new(0.8, 0.4, 0.5),
+		color = Color3.fromRGB(210, 180, 100),
+		material = Enum.Material.SmoothPlastic,
+	},
+	herb_tea = {
+		shape = CYLINDER,
+		size = Vector3.new(0.5, 0.7, 0.5),
+		color = Color3.fromRGB(80, 140, 60),
+		material = Enum.Material.Glass,
+		transparency = 0.2,
+	},
+	power_meal = {
+		shape = BLOCK,
+		size = Vector3.new(1.0, 0.5, 0.8),
+		color = Color3.fromRGB(200, 160, 80),
+		material = Enum.Material.SmoothPlastic,
+		glow = Color3.fromRGB(255, 200, 50),
+	},
+	steak = {
+		shape = BLOCK,
+		size = Vector3.new(0.8, 0.3, 0.6),
+		color = Color3.fromRGB(130, 50, 40),
+		material = Enum.Material.SmoothPlastic,
+	},
+	fresh_fish = {
+		shape = BLOCK,
+		size = Vector3.new(1.2, 0.3, 0.5),
+		color = Color3.fromRGB(120, 150, 170),
+		material = Enum.Material.SmoothPlastic,
+	},
+
+	------------------------------------------------------------------------
+	-- WEAPONS - Melee
+	------------------------------------------------------------------------
+	baseball_bat = {
+		shape = BLOCK,
+		size = Vector3.new(0.3, 0.3, 2.5),
+		color = Color3.fromRGB(140, 100, 55),
+		material = Enum.Material.Wood,
+	},
+	kitchen_knife = {
+		shape = BLOCK,
+		size = Vector3.new(0.15, 0.1, 1.2),
+		color = Color3.fromRGB(180, 180, 190),
+		material = Enum.Material.Metal,
+	},
+	crowbar = {
+		shape = BLOCK,
+		size = Vector3.new(0.2, 0.2, 2.0),
+		color = Color3.fromRGB(60, 60, 70),
+		material = Enum.Material.Metal,
+	},
+	fire_axe = {
+		shape = BLOCK,
+		size = Vector3.new(0.3, 1.0, 2.2),
+		color = Color3.fromRGB(180, 30, 20),
+		material = Enum.Material.Metal,
+	},
+
+	------------------------------------------------------------------------
+	-- WEAPONS - Ranged
+	------------------------------------------------------------------------
+	pistol = {
+		shape = BLOCK,
+		size = Vector3.new(0.3, 0.7, 0.9),
+		color = Color3.fromRGB(40, 40, 45),
+		material = Enum.Material.Metal,
+	},
+	shotgun = {
+		shape = BLOCK,
+		size = Vector3.new(0.25, 0.35, 2.5),
+		color = Color3.fromRGB(50, 45, 40),
+		material = Enum.Material.Metal,
+	},
+	rifle = {
+		shape = BLOCK,
+		size = Vector3.new(0.2, 0.35, 3.0),
+		color = Color3.fromRGB(45, 50, 45),
+		material = Enum.Material.Metal,
+	},
+
+	------------------------------------------------------------------------
+	-- AMMO
+	------------------------------------------------------------------------
+	pistol_ammo = {
+		shape = BLOCK,
+		size = Vector3.new(0.6, 0.4, 0.4),
+		color = Color3.fromRGB(170, 150, 60),
+		material = Enum.Material.Cardboard,
+	},
+	shotgun_shells = {
+		shape = BLOCK,
+		size = Vector3.new(0.7, 0.4, 0.5),
+		color = Color3.fromRGB(180, 40, 30),
+		material = Enum.Material.Cardboard,
+	},
+	rifle_ammo = {
+		shape = BLOCK,
+		size = Vector3.new(0.6, 0.5, 0.4),
+		color = Color3.fromRGB(60, 80, 50),
+		material = Enum.Material.Cardboard,
+	},
+
+	------------------------------------------------------------------------
+	-- BUILDING MATERIALS
+	------------------------------------------------------------------------
+	plywood = {
+		shape = BLOCK,
+		size = Vector3.new(1.5, 1.2, 0.15),
+		color = Color3.fromRGB(180, 150, 90),
+		material = Enum.Material.Wood,
+	},
+	wooden_planks = {
+		shape = BLOCK,
+		size = Vector3.new(1.5, 0.2, 0.6),
+		color = Color3.fromRGB(150, 120, 70),
+		material = Enum.Material.Wood,
+	},
+	duct_tape = {
+		shape = CYLINDER,
+		size = Vector3.new(0.6, 0.3, 0.6),
+		color = Color3.fromRGB(130, 130, 130),
+		material = Enum.Material.Fabric,
+	},
+	nails = {
+		shape = BLOCK,
+		size = Vector3.new(0.5, 0.3, 0.4),
+		color = Color3.fromRGB(120, 120, 130),
+		material = Enum.Material.Metal,
+	},
+	scrap_metal = {
+		shape = BLOCK,
+		size = Vector3.new(0.8, 0.5, 0.6),
+		color = Color3.fromRGB(100, 100, 110),
+		material = Enum.Material.CorrodedMetal,
+	},
+	reinforced_boards = {
+		shape = BLOCK,
+		size = Vector3.new(1.4, 0.3, 0.8),
+		color = Color3.fromRGB(100, 80, 55),
+		material = Enum.Material.Wood,
+	},
+	steel_nails = {
+		shape = BLOCK,
+		size = Vector3.new(0.4, 0.3, 0.3),
+		color = Color3.fromRGB(170, 170, 180),
+		material = Enum.Material.Metal,
+	},
+	chain_lock = {
+		shape = CYLINDER,
+		size = Vector3.new(0.5, 0.5, 0.5),
+		color = Color3.fromRGB(150, 150, 160),
+		material = Enum.Material.Metal,
+	},
+	sandbags = {
+		shape = BLOCK,
+		size = Vector3.new(1.0, 0.5, 0.6),
+		color = Color3.fromRGB(160, 145, 100),
+		material = Enum.Material.Fabric,
+	},
+	steel_panels = {
+		shape = BLOCK,
+		size = Vector3.new(1.5, 1.0, 0.1),
+		color = Color3.fromRGB(160, 160, 170),
+		material = Enum.Material.Metal,
+	},
+	bulletproof_glass = {
+		shape = BLOCK,
+		size = Vector3.new(1.2, 0.8, 0.1),
+		color = Color3.fromRGB(150, 180, 200),
+		material = Enum.Material.Glass,
+		transparency = 0.3,
+	},
+	industrial_lock = {
+		shape = BLOCK,
+		size = Vector3.new(0.4, 0.5, 0.3),
+		color = Color3.fromRGB(80, 80, 90),
+		material = Enum.Material.Metal,
+	},
+	steel_door = {
+		shape = BLOCK,
+		size = Vector3.new(1.2, 1.5, 0.15),
+		color = Color3.fromRGB(120, 120, 130),
+		material = Enum.Material.Metal,
+	},
+
+	------------------------------------------------------------------------
+	-- FUEL
+	------------------------------------------------------------------------
+	fuel_small = {
+		shape = CYLINDER,
+		size = Vector3.new(0.5, 0.7, 0.5),
+		color = Color3.fromRGB(200, 40, 30),
+		material = Enum.Material.Metal,
+	},
+	fuel_medium = {
+		shape = CYLINDER,
+		size = Vector3.new(0.6, 1.0, 0.6),
+		color = Color3.fromRGB(200, 40, 30),
+		material = Enum.Material.Metal,
+	},
+	fuel_large = {
+		shape = CYLINDER,
+		size = Vector3.new(0.8, 1.2, 0.8),
+		color = Color3.fromRGB(200, 40, 30),
+		material = Enum.Material.Metal,
+	},
+
+	------------------------------------------------------------------------
+	-- GENERATOR PARTS
+	------------------------------------------------------------------------
+	spark_plugs = {
+		shape = BLOCK,
+		size = Vector3.new(0.4, 0.5, 0.3),
+		color = Color3.fromRGB(140, 140, 150),
+		material = Enum.Material.Metal,
+	},
+	wiring = {
+		shape = BLOCK,
+		size = Vector3.new(0.6, 0.4, 0.6),
+		color = Color3.fromRGB(200, 60, 30),
+		material = Enum.Material.Fabric,
+	},
+	fan_belt = {
+		shape = CYLINDER,
+		size = Vector3.new(0.7, 0.15, 0.7),
+		color = Color3.fromRGB(30, 30, 30),
+		material = Enum.Material.Fabric,
+	},
+	industrial_motor = {
+		shape = BLOCK,
+		size = Vector3.new(0.8, 0.6, 0.6),
+		color = Color3.fromRGB(80, 80, 90),
+		material = Enum.Material.Metal,
+		glow = Color3.fromRGB(80, 120, 255),
+	},
+	voltage_regulator = {
+		shape = BLOCK,
+		size = Vector3.new(0.5, 0.6, 0.4),
+		color = Color3.fromRGB(60, 70, 60),
+		material = Enum.Material.Metal,
+	},
+	heavy_fuel_tank = {
+		shape = CYLINDER,
+		size = Vector3.new(1.0, 1.4, 1.0),
+		color = Color3.fromRGB(180, 50, 30),
+		material = Enum.Material.Metal,
+	},
+	solar_panel = {
+		shape = BLOCK,
+		size = Vector3.new(1.5, 0.1, 1.0),
+		color = Color3.fromRGB(30, 40, 80),
+		material = Enum.Material.Glass,
+		glow = Color3.fromRGB(50, 100, 255),
+	},
+
+	------------------------------------------------------------------------
+	-- TOOLS
+	------------------------------------------------------------------------
+	flashlight = {
+		shape = CYLINDER,
+		size = Vector3.new(0.3, 1.0, 0.3),
+		color = Color3.fromRGB(40, 40, 45),
+		material = Enum.Material.Metal,
+	},
+	candle = {
+		shape = CYLINDER,
+		size = Vector3.new(0.2, 0.6, 0.2),
+		color = Color3.fromRGB(230, 220, 180),
+		material = Enum.Material.SmoothPlastic,
+		glow = Color3.fromRGB(255, 200, 100),
+	},
+	flare = {
+		shape = CYLINDER,
+		size = Vector3.new(0.2, 0.8, 0.2),
+		color = Color3.fromRGB(220, 40, 30),
+		material = Enum.Material.Neon,
+	},
+	glow_stick = {
+		shape = CYLINDER,
+		size = Vector3.new(0.15, 0.8, 0.15),
+		color = Color3.fromRGB(50, 255, 100),
+		material = Enum.Material.Neon,
+		glow = Color3.fromRGB(50, 255, 100),
+	},
+	lockpick = {
+		shape = BLOCK,
+		size = Vector3.new(0.1, 0.1, 0.8),
+		color = Color3.fromRGB(150, 150, 160),
+		material = Enum.Material.Metal,
+	},
+	fishing_rod = {
+		shape = BLOCK,
+		size = Vector3.new(0.15, 0.15, 2.5),
+		color = Color3.fromRGB(100, 80, 50),
+		material = Enum.Material.Wood,
+	},
+	snare_trap = {
+		shape = BLOCK,
+		size = Vector3.new(0.6, 0.4, 0.6),
+		color = Color3.fromRGB(120, 100, 70),
+		material = Enum.Material.Fabric,
+	},
+
+	------------------------------------------------------------------------
+	-- TRAPS
+	------------------------------------------------------------------------
+	noise_maker = {
+		shape = CYLINDER,
+		size = Vector3.new(0.4, 0.4, 0.4),
+		color = Color3.fromRGB(200, 200, 50),
+		material = Enum.Material.Metal,
+	},
+	spike_strip = {
+		shape = BLOCK,
+		size = Vector3.new(1.2, 0.15, 0.6),
+		color = Color3.fromRGB(80, 80, 90),
+		material = Enum.Material.Metal,
+	},
+	tripwire = {
+		shape = BLOCK,
+		size = Vector3.new(0.3, 0.3, 0.8),
+		color = Color3.fromRGB(100, 100, 50),
+		material = Enum.Material.Fabric,
+	},
+	turret_components = {
+		shape = BLOCK,
+		size = Vector3.new(0.8, 0.6, 0.8),
+		color = Color3.fromRGB(60, 60, 70),
+		material = Enum.Material.Metal,
+		glow = Color3.fromRGB(180, 0, 255),
+	},
+	electric_fence_kit = {
+		shape = BLOCK,
+		size = Vector3.new(0.8, 0.6, 0.5),
+		color = Color3.fromRGB(220, 200, 50),
+		material = Enum.Material.Metal,
+		glow = Color3.fromRGB(255, 255, 50),
+	},
+
+	------------------------------------------------------------------------
+	-- SEEDS
+	------------------------------------------------------------------------
+	tomato_seed = {
+		shape = BLOCK,
+		size = Vector3.new(0.4, 0.5, 0.2),
+		color = Color3.fromRGB(180, 50, 30),
+		material = Enum.Material.Cardboard,
+	},
+	potato_seed = {
+		shape = BLOCK,
+		size = Vector3.new(0.4, 0.5, 0.2),
+		color = Color3.fromRGB(160, 130, 70),
+		material = Enum.Material.Cardboard,
+	},
+	herb_seed = {
+		shape = BLOCK,
+		size = Vector3.new(0.4, 0.5, 0.2),
+		color = Color3.fromRGB(50, 130, 40),
+		material = Enum.Material.Cardboard,
+	},
+
+	------------------------------------------------------------------------
+	-- COOKING STATIONS
+	------------------------------------------------------------------------
+	campfire_kit = {
+		shape = BLOCK,
+		size = Vector3.new(0.8, 0.5, 0.6),
+		color = Color3.fromRGB(120, 80, 40),
+		material = Enum.Material.Wood,
+	},
+	stove_parts = {
+		shape = BLOCK,
+		size = Vector3.new(0.7, 0.6, 0.5),
+		color = Color3.fromRGB(100, 100, 110),
+		material = Enum.Material.Metal,
+	},
+	kitchen_parts = {
+		shape = BLOCK,
+		size = Vector3.new(0.9, 0.6, 0.6),
+		color = Color3.fromRGB(160, 160, 165),
+		material = Enum.Material.Metal,
+		glow = Color3.fromRGB(80, 120, 255),
+	},
+
+	------------------------------------------------------------------------
+	-- RECIPES (paper/book items)
+	------------------------------------------------------------------------
+	recipe_heated_beans = {
+		shape = BLOCK,
+		size = Vector3.new(0.6, 0.05, 0.4),
+		color = Color3.fromRGB(220, 210, 180),
+		material = Enum.Material.SmoothPlastic,
+	},
+	recipe_roasted_rabbit = {
+		shape = BLOCK,
+		size = Vector3.new(0.6, 0.05, 0.4),
+		color = Color3.fromRGB(220, 210, 180),
+		material = Enum.Material.SmoothPlastic,
+	},
+	recipe_venison_stew = {
+		shape = BLOCK,
+		size = Vector3.new(0.6, 0.05, 0.4),
+		color = Color3.fromRGB(220, 210, 180),
+		material = Enum.Material.SmoothPlastic,
+	},
+	recipe_fish_tacos = {
+		shape = BLOCK,
+		size = Vector3.new(0.6, 0.05, 0.4),
+		color = Color3.fromRGB(220, 210, 180),
+		material = Enum.Material.SmoothPlastic,
+	},
+	recipe_herb_tea = {
+		shape = BLOCK,
+		size = Vector3.new(0.6, 0.05, 0.4),
+		color = Color3.fromRGB(200, 220, 180),
+		material = Enum.Material.SmoothPlastic,
+	},
+	recipe_power_meal = {
+		shape = BLOCK,
+		size = Vector3.new(0.6, 0.05, 0.4),
+		color = Color3.fromRGB(255, 230, 180),
+		material = Enum.Material.SmoothPlastic,
+		glow = Color3.fromRGB(255, 200, 50),
+	},
+}
+
+------------------------------------------------------------------------
+-- Category defaults (fallback for items without specific definitions)
+------------------------------------------------------------------------
+ItemVisuals.CategoryDefaults = {
+	Food = {
+		shape = BLOCK,
+		size = Vector3.new(0.7, 0.5, 0.5),
+		color = Color3.fromRGB(160, 130, 80),
+		material = Enum.Material.SmoothPlastic,
+	},
+	Weapon = {
+		shape = BLOCK,
+		size = Vector3.new(0.3, 0.3, 1.5),
+		color = Color3.fromRGB(80, 80, 90),
+		material = Enum.Material.Metal,
+	},
+	Ammo = {
+		shape = BLOCK,
+		size = Vector3.new(0.5, 0.4, 0.4),
+		color = Color3.fromRGB(160, 140, 60),
+		material = Enum.Material.Cardboard,
+	},
+	BuildingMaterial = {
+		shape = BLOCK,
+		size = Vector3.new(1.0, 0.5, 0.5),
+		color = Color3.fromRGB(140, 120, 80),
+		material = Enum.Material.Wood,
+	},
+	Fuel = {
+		shape = CYLINDER,
+		size = Vector3.new(0.6, 0.8, 0.6),
+		color = Color3.fromRGB(200, 40, 30),
+		material = Enum.Material.Metal,
+	},
+	Tool = {
+		shape = BLOCK,
+		size = Vector3.new(0.3, 0.3, 1.0),
+		color = Color3.fromRGB(100, 90, 70),
+		material = Enum.Material.Metal,
+	},
+	Trap = {
+		shape = BLOCK,
+		size = Vector3.new(0.6, 0.4, 0.6),
+		color = Color3.fromRGB(120, 110, 60),
+		material = Enum.Material.Metal,
+	},
+	LightSource = {
+		shape = CYLINDER,
+		size = Vector3.new(0.25, 0.7, 0.25),
+		color = Color3.fromRGB(200, 190, 100),
+		material = Enum.Material.SmoothPlastic,
+	},
+	GeneratorPart = {
+		shape = BLOCK,
+		size = Vector3.new(0.6, 0.5, 0.5),
+		color = Color3.fromRGB(100, 100, 110),
+		material = Enum.Material.Metal,
+	},
+	CookingStation = {
+		shape = BLOCK,
+		size = Vector3.new(0.8, 0.5, 0.6),
+		color = Color3.fromRGB(120, 100, 70),
+		material = Enum.Material.Metal,
+	},
+	Seed = {
+		shape = BLOCK,
+		size = Vector3.new(0.4, 0.5, 0.2),
+		color = Color3.fromRGB(140, 120, 60),
+		material = Enum.Material.Cardboard,
+	},
+	Recipe = {
+		shape = BLOCK,
+		size = Vector3.new(0.6, 0.05, 0.4),
+		color = Color3.fromRGB(220, 210, 180),
+		material = Enum.Material.SmoothPlastic,
+	},
+}
+
+------------------------------------------------------------------------
+-- Get visual definition for an item (falls back to category default)
+------------------------------------------------------------------------
+function ItemVisuals.GetVisual(itemId: string, category: string?)
+	local specific = ItemVisuals.Items[itemId]
+	if specific then return specific end
+
+	if category then
+		local catDefault = ItemVisuals.CategoryDefaults[category]
+		if catDefault then return catDefault end
+	end
+
+	-- Ultimate fallback
+	return {
+		shape = BLOCK,
+		size = Vector3.new(0.6, 0.6, 0.6),
+		color = Color3.fromRGB(180, 180, 180),
+		material = Enum.Material.SmoothPlastic,
+	}
+end
+
+return ItemVisuals
+</ProtectedString>
+            <bool name="Disabled">false</bool>
+          </Properties>
+        </Item>
       </Item>
     </Item>
-    <Item class="Folder" referent="RBX00000015">
+    <Item class="Folder" referent="RBX00000016">
       <Properties>
         <string name="Name">Remotes</string>
       </Properties>
-      <Item class="RemoteEvent" referent="RBX00000016">
-        <Properties>
-          <string name="Name">NotifyPlayers</string>
-        </Properties>
-      </Item>
-      <Item class="RemoteEvent" referent="RBX00000017">
-        <Properties>
-          <string name="Name">GamePhaseChanged</string>
-        </Properties>
-      </Item>
-      <Item class="RemoteEvent" referent="RBX00000018">
-        <Properties>
-          <string name="Name">UpdateHUD</string>
-        </Properties>
-      </Item>
-      <Item class="RemoteEvent" referent="RBX00000019">
-        <Properties>
-          <string name="Name">PurgeCountdown</string>
-        </Properties>
-      </Item>
-      <Item class="RemoteEvent" referent="RBX0000001A">
-        <Properties>
-          <string name="Name">PurgeSiren</string>
-        </Properties>
-      </Item>
-      <Item class="RemoteEvent" referent="RBX0000001B">
-        <Properties>
-          <string name="Name">PurgeStarted</string>
-        </Properties>
-      </Item>
-      <Item class="RemoteEvent" referent="RBX0000001C">
-        <Properties>
-          <string name="Name">PurgeEnded</string>
-        </Properties>
-      </Item>
-      <Item class="RemoteEvent" referent="RBX0000001D">
-        <Properties>
-          <string name="Name">DayChanged</string>
-        </Properties>
-      </Item>
-      <Item class="RemoteEvent" referent="RBX0000001E">
-        <Properties>
-          <string name="Name">PowerOutAlert</string>
-        </Properties>
-      </Item>
-      <Item class="RemoteEvent" referent="RBX0000001F">
-        <Properties>
-          <string name="Name">PlayerDowned</string>
-        </Properties>
-      </Item>
-      <Item class="RemoteEvent" referent="RBX00000020">
-        <Properties>
-          <string name="Name">PlayerRevived</string>
-        </Properties>
-      </Item>
-      <Item class="RemoteEvent" referent="RBX00000021">
-        <Properties>
-          <string name="Name">UseItem</string>
-        </Properties>
-      </Item>
-      <Item class="RemoteEvent" referent="RBX00000022">
-        <Properties>
-          <string name="Name">DropItem</string>
-        </Properties>
-      </Item>
-      <Item class="RemoteEvent" referent="RBX00000023">
-        <Properties>
-          <string name="Name">PickupItem</string>
-        </Properties>
-      </Item>
-      <Item class="RemoteEvent" referent="RBX00000024">
-        <Properties>
-          <string name="Name">CookRequest</string>
-        </Properties>
-      </Item>
-      <Item class="RemoteEvent" referent="RBX00000025">
-        <Properties>
-          <string name="Name">FortifyRequest</string>
-        </Properties>
-      </Item>
-      <Item class="RemoteEvent" referent="RBX00000026">
-        <Properties>
-          <string name="Name">RefuelRequest</string>
-        </Properties>
-      </Item>
-      <Item class="RemoteEvent" referent="RBX00000027">
-        <Properties>
-          <string name="Name">ReviveRequest</string>
-        </Properties>
-      </Item>
-      <Item class="RemoteEvent" referent="RBX00000028">
-        <Properties>
-          <string name="Name">InteractRequest</string>
-        </Properties>
-      </Item>
+        <Item class="RemoteEvent" referent="RBX00000017">
+          <Properties>
+            <string name="Name">NotifyPlayers</string>
+          </Properties>
+        </Item>
+        <Item class="RemoteEvent" referent="RBX00000018">
+          <Properties>
+            <string name="Name">GamePhaseChanged</string>
+          </Properties>
+        </Item>
+        <Item class="RemoteEvent" referent="RBX00000019">
+          <Properties>
+            <string name="Name">UpdateHUD</string>
+          </Properties>
+        </Item>
+        <Item class="RemoteEvent" referent="RBX0000001A">
+          <Properties>
+            <string name="Name">PurgeCountdown</string>
+          </Properties>
+        </Item>
+        <Item class="RemoteEvent" referent="RBX0000001B">
+          <Properties>
+            <string name="Name">PurgeSiren</string>
+          </Properties>
+        </Item>
+        <Item class="RemoteEvent" referent="RBX0000001C">
+          <Properties>
+            <string name="Name">PurgeStarted</string>
+          </Properties>
+        </Item>
+        <Item class="RemoteEvent" referent="RBX0000001D">
+          <Properties>
+            <string name="Name">PurgeEnded</string>
+          </Properties>
+        </Item>
+        <Item class="RemoteEvent" referent="RBX0000001E">
+          <Properties>
+            <string name="Name">DayChanged</string>
+          </Properties>
+        </Item>
+        <Item class="RemoteEvent" referent="RBX0000001F">
+          <Properties>
+            <string name="Name">PowerOutAlert</string>
+          </Properties>
+        </Item>
+        <Item class="RemoteEvent" referent="RBX00000020">
+          <Properties>
+            <string name="Name">PlayerDowned</string>
+          </Properties>
+        </Item>
+        <Item class="RemoteEvent" referent="RBX00000021">
+          <Properties>
+            <string name="Name">PlayerRevived</string>
+          </Properties>
+        </Item>
+        <Item class="RemoteEvent" referent="RBX00000022">
+          <Properties>
+            <string name="Name">UseItem</string>
+          </Properties>
+        </Item>
+        <Item class="RemoteEvent" referent="RBX00000023">
+          <Properties>
+            <string name="Name">DropItem</string>
+          </Properties>
+        </Item>
+        <Item class="RemoteEvent" referent="RBX00000024">
+          <Properties>
+            <string name="Name">PickupItem</string>
+          </Properties>
+        </Item>
+        <Item class="RemoteEvent" referent="RBX00000025">
+          <Properties>
+            <string name="Name">CookRequest</string>
+          </Properties>
+        </Item>
+        <Item class="RemoteEvent" referent="RBX00000026">
+          <Properties>
+            <string name="Name">FortifyRequest</string>
+          </Properties>
+        </Item>
+        <Item class="RemoteEvent" referent="RBX00000027">
+          <Properties>
+            <string name="Name">RefuelRequest</string>
+          </Properties>
+        </Item>
+        <Item class="RemoteEvent" referent="RBX00000028">
+          <Properties>
+            <string name="Name">ReviveRequest</string>
+          </Properties>
+        </Item>
+        <Item class="RemoteEvent" referent="RBX00000029">
+          <Properties>
+            <string name="Name">InteractRequest</string>
+          </Properties>
+        </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="RBX00000029">
+  <Item class="ServerScriptService" referent="RBX0000002A">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="RBX0000002A">
+    <Item class="Script" referent="RBX0000002B">
       <Properties>
         <string name="Name">GameManager</string>
         <ProtectedString name="Source">--[[
@@ -2909,10 +3626,9 @@ end
 print("[GameManager] Initialized - The Purge: Suburban Survival")
 </ProtectedString>
         <bool name="Disabled">false</bool>
-        <token name="RunContext">0</token>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX0000002B">
+    <Item class="Script" referent="RBX0000002C">
       <Properties>
         <string name="Name">InventoryService</string>
         <ProtectedString name="Source">--[[
@@ -3303,16 +4019,16 @@ end)
 print("[InventoryService] Initialized")
 </ProtectedString>
         <bool name="Disabled">false</bool>
-        <token name="RunContext">0</token>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX0000002C">
+    <Item class="Script" referent="RBX0000002D">
       <Properties>
         <string name="Name">LootService</string>
         <ProtectedString name="Source">--[[
 	LootService.server.lua
 	Manages loot spawning in houses throughout the neighborhood.
-	Each house has loot containers that respawn on a day-cycle timer.
+	Items visually look like what they are (cans, weapons, tools, etc.)
+	and are placed on furniture surfaces (shelves, tables, counters).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -3324,28 +4040,33 @@ local Modules = Shared:WaitForChild("Modules")
 local Config = require(Modules.Config)
 local Enums = require(Modules.Enums)
 local ItemDatabase = require(Modules.ItemDatabase)
+local ItemVisuals = require(Modules.ItemVisuals)
 local Utils = require(Modules.Utils)
 
 ------------------------------------------------------------------------
 -- Loot Container Registry
 ------------------------------------------------------------------------
--- Each house/location in the map should have parts tagged "LootContainer"
--- with attributes: Zone (1-3), LocationType (string), ContainerIndex (number)
-
 local LootContainers = {}  -- [containerPart] = { zone, items, lastLooted, respawnDay }
 
 ------------------------------------------------------------------------
--- Spawn Loot for a Container
+-- Part shape helper
+------------------------------------------------------------------------
+local ShapeMap = {
+	Block = Enum.PartType.Block,
+	Cylinder = Enum.PartType.Cylinder,
+	Ball = Enum.PartType.Ball,
+}
+
+------------------------------------------------------------------------
+-- Generate Loot for a Container
 ------------------------------------------------------------------------
 local function GenerateLootForContainer(zone: number, locationType: string?): { any }
 	local maxItems = Config.Loot.MaxItemsPerHouse[zone] or 4
 	local itemCount = math.random(math.ceil(maxItems * 0.5), maxItems)
 
-	-- Get loot pool
 	local pool
 	if locationType and ItemDatabase.BonusLoot[locationType] then
 		pool = ItemDatabase.BonusLoot[locationType]
-		-- Apply bonus multiplier
 		local mult = Config.Loot.BonusMultiplier[locationType] or 1
 		itemCount = math.floor(itemCount * mult)
 	else
@@ -3356,14 +4077,11 @@ local function GenerateLootForContainer(zone: number, locationType: string?): { 
 	local tierWeights = Config.Loot.TierWeights[zone] or Config.Loot.TierWeights[1]
 
 	for _ = 1, itemCount do
-		-- Pick a random item from the pool
 		local itemId = pool[math.random(1, #pool)]
 		local itemData = ItemDatabase.GetItem(itemId)
 
 		if itemData then
-			-- Check if item tier matches zone tier weights
 			local targetTier = Utils.PickTier(tierWeights)
-			-- Allow the item if its tier matches or is lower than target
 			local tierOrder = { Common = 1, Uncommon = 2, Rare = 3, Epic = 4 }
 			local itemTierOrder = tierOrder[itemData.tier] or 1
 			local targetTierOrder = tierOrder[targetTier] or 1
@@ -3385,7 +4103,118 @@ local function GenerateLootForContainer(zone: number, locationType: string?): { 
 end
 
 ------------------------------------------------------------------------
--- Create Physical Loot Items in a Container
+-- Create a single loot item Part with proper visuals
+------------------------------------------------------------------------
+local function CreateLootPart(item, itemData, position: CFrame, parent)
+	local visual = ItemVisuals.GetVisual(item.itemId, itemData.category)
+
+	local lootPart = Instance.new("Part")
+	lootPart.Name = "Loot_" .. item.itemId
+	lootPart.Size = visual.size
+	lootPart.Anchored = true
+	lootPart.CanCollide = false
+	lootPart.Material = visual.material
+	lootPart.Color = visual.color
+	lootPart.Transparency = visual.transparency or 0
+
+	-- Apply shape
+	local shape = ShapeMap[visual.shape]
+	if shape then
+		lootPart.Shape = shape
+	end
+
+	lootPart.CFrame = position
+
+	-- Set item data as attributes
+	lootPart:SetAttribute("ItemId", item.itemId)
+	lootPart:SetAttribute("Quantity", item.quantity)
+	lootPart:SetAttribute("ItemName", itemData.name)
+	lootPart:SetAttribute("ItemTier", itemData.tier)
+
+	CollectionService:AddTag(lootPart, "LootItem")
+
+	-- Glow effect for rare/special items
+	if visual.glow then
+		local glow = Instance.new("PointLight")
+		glow.Color = visual.glow
+		glow.Range = 4
+		glow.Brightness = 0.6
+		glow.Parent = lootPart
+	end
+
+	-- Tier-colored sparkle for Rare+ items
+	local tierOrder = { Common = 1, Uncommon = 2, Rare = 3, Epic = 4 }
+	if (tierOrder[itemData.tier] or 1) &gt;= 3 then
+		local sparkle = Instance.new("ParticleEmitter")
+		sparkle.Name = "TierSparkle"
+		sparkle.Rate = 3
+		sparkle.Lifetime = NumberRange.new(0.5, 1)
+		sparkle.Speed = NumberRange.new(0.5, 1)
+		sparkle.SpreadAngle = Vector2.new(180, 180)
+		sparkle.Size = NumberSequence.new(0.15, 0)
+		sparkle.LightEmission = 1
+		sparkle.Color = ColorSequence.new(Enums.TierColor[itemData.tier] or Color3.new(1, 1, 1))
+		sparkle.Parent = lootPart
+	end
+
+	-- Billboard label (name + quantity)
+	local tierColor = Enums.TierColor[itemData.tier]
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Size = UDim2.new(0, 150, 0, 45)
+	billboard.StudsOffset = Vector3.new(0, 1.2, 0)
+	billboard.AlwaysOnTop = false
+	billboard.MaxDistance = 16
+	billboard.Parent = lootPart
+
+	-- Background frame for readability
+	local bgFrame = Instance.new("Frame")
+	bgFrame.Size = UDim2.new(1, 0, 1, 0)
+	bgFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+	bgFrame.BackgroundTransparency = 0.5
+	bgFrame.BorderSizePixel = 0
+	bgFrame.Parent = billboard
+
+	local bgCorner = Instance.new("UICorner")
+	bgCorner.CornerRadius = UDim.new(0, 4)
+	bgCorner.Parent = bgFrame
+
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Size = UDim2.new(1, -4, 0.65, 0)
+	nameLabel.Position = UDim2.new(0, 2, 0, 0)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Text = itemData.name
+	nameLabel.TextColor3 = tierColor or Color3.new(1, 1, 1)
+	nameLabel.TextScaled = true
+	nameLabel.Font = Enum.Font.GothamBold
+	nameLabel.Parent = bgFrame
+
+	if item.quantity &gt; 1 then
+		local quantityLabel = Instance.new("TextLabel")
+		quantityLabel.Size = UDim2.new(1, -4, 0.35, 0)
+		quantityLabel.Position = UDim2.new(0, 2, 0.65, 0)
+		quantityLabel.BackgroundTransparency = 1
+		quantityLabel.Text = "x" .. item.quantity
+		quantityLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+		quantityLabel.TextScaled = true
+		quantityLabel.Font = Enum.Font.Gotham
+		quantityLabel.Parent = bgFrame
+	end
+
+	-- Proximity prompt for pickup
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "Pick Up"
+	prompt.ObjectText = itemData.name
+	prompt.MaxActivationDistance = Config.Player.PickupRange
+	prompt.HoldDuration = 0.2
+	prompt.Parent = lootPart
+
+	lootPart.Parent = parent
+	return lootPart
+end
+
+------------------------------------------------------------------------
+-- Spawn Loot in a Container (furniture surface)
 ------------------------------------------------------------------------
 local function SpawnLootInContainer(containerPart: BasePart, items: { any })
 	-- Clear existing loot
@@ -3395,74 +4224,39 @@ local function SpawnLootInContainer(containerPart: BasePart, items: { any })
 		end
 	end
 
+	local containerSize = containerPart.Size
+	local containerCF = containerPart.CFrame
+
 	for i, item in ipairs(items) do
 		local itemData = ItemDatabase.GetItem(item.itemId)
 		if not itemData then continue end
 
-		local lootPart = Instance.new("Part")
-		lootPart.Name = "Loot_" .. item.itemId
-		lootPart.Size = Vector3.new(1, 1, 1)
-		lootPart.Anchored = true
-		lootPart.CanCollide = false
+		local visual = ItemVisuals.GetVisual(item.itemId, itemData.category)
 
-		-- Position loot items inside the container spread out
-		local offset = Vector3.new(
-			(i - 1) % 3 * 1.5 - 1.5,
-			0.5,
-			math.floor((i - 1) / 3) * 1.5
-		)
-		lootPart.CFrame = containerPart.CFrame * CFrame.new(offset)
+		-- Spread items across the furniture surface
+		local maxPerRow = math.max(1, math.floor(containerSize.X / 1.2))
+		local row = math.floor((i - 1) / maxPerRow)
+		local col = (i - 1) % maxPerRow
 
-		-- Color by tier
-		local tierColor = Enums.TierColor[itemData.tier]
-		if tierColor then
-			lootPart.Color = tierColor
-		end
+		local xSpread = containerSize.X * 0.8
+		local zSpread = containerSize.Z * 0.6
+		local xStart = -xSpread / 2
+		local zStart = -zSpread / 2
 
-		-- Set item data as attributes
-		lootPart:SetAttribute("ItemId", item.itemId)
-		lootPart:SetAttribute("Quantity", item.quantity)
-		lootPart:SetAttribute("ItemName", itemData.name)
-		lootPart:SetAttribute("ItemTier", itemData.tier)
+		local xStep = maxPerRow &gt; 1 and (xSpread / (maxPerRow - 1)) or 0
+		local zStep = 1.2
 
-		CollectionService:AddTag(lootPart, "LootItem")
+		local localX = maxPerRow &gt; 1 and (xStart + col * xStep) or 0
+		local localZ = zStart + row * zStep
+		local localY = containerSize.Y / 2 + visual.size.Y / 2 + 0.05
 
-		-- Billboard label
-		local billboard = Instance.new("BillboardGui")
-		billboard.Size = UDim2.new(0, 140, 0, 40)
-		billboard.StudsOffset = Vector3.new(0, 1.5, 0)
-		billboard.AlwaysOnTop = false
-		billboard.MaxDistance = 20
-		billboard.Parent = lootPart
+		local itemCF = containerCF * CFrame.new(localX, localY, localZ)
 
-		local nameLabel = Instance.new("TextLabel")
-		nameLabel.Size = UDim2.new(1, 0, 0.6, 0)
-		nameLabel.BackgroundTransparency = 1
-		nameLabel.Text = itemData.name
-		nameLabel.TextColor3 = tierColor or Color3.new(1, 1, 1)
-		nameLabel.TextScaled = true
-		nameLabel.Font = Enum.Font.GothamBold
-		nameLabel.Parent = billboard
+		-- Slight random rotation for natural look
+		local yRot = math.rad(math.random(-15, 15))
+		itemCF = itemCF * CFrame.Angles(0, yRot, 0)
 
-		local quantityLabel = Instance.new("TextLabel")
-		quantityLabel.Size = UDim2.new(1, 0, 0.4, 0)
-		quantityLabel.Position = UDim2.new(0, 0, 0.6, 0)
-		quantityLabel.BackgroundTransparency = 1
-		quantityLabel.Text = item.quantity &gt; 1 and ("x" .. item.quantity) or ""
-		quantityLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-		quantityLabel.TextScaled = true
-		quantityLabel.Font = Enum.Font.Gotham
-		quantityLabel.Parent = billboard
-
-		-- Proximity prompt for pickup
-		local prompt = Instance.new("ProximityPrompt")
-		prompt.ActionText = "Pick Up"
-		prompt.ObjectText = itemData.name
-		prompt.MaxActivationDistance = Config.Player.PickupRange
-		prompt.HoldDuration = 0.3
-		prompt.Parent = lootPart
-
-		lootPart.Parent = containerPart
+		CreateLootPart(item, itemData, itemCF, containerPart)
 	end
 end
 
@@ -3488,7 +4282,7 @@ local function InitializeContainers()
 		}
 	end
 
-	print("[LootService] Initialized " .. #containers .. " loot containers")
+	print("[LootService] Initialized " .. #containers .. " loot containers with visual items")
 end
 
 ------------------------------------------------------------------------
@@ -3511,14 +4305,9 @@ CollectionService:GetInstanceAddedSignal("LootContainer"):Connect(function(conta
 end)
 
 ------------------------------------------------------------------------
--- Loot Respawn Check (triggered by DayChanged event)
+-- Loot Respawn Check
 ------------------------------------------------------------------------
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
-local DayChanged = Remotes:WaitForChild("DayChanged")
-
--- Listen for day changes to handle respawns
--- We use a BindableEvent since DayChanged is a RemoteEvent (client-facing)
--- Instead, we'll poll the game state periodically
 local lastKnownDay = 0
 
 RunService.Heartbeat:Connect(function()
@@ -3531,7 +4320,6 @@ RunService.Heartbeat:Connect(function()
 	if state.currentDay &gt; lastKnownDay then
 		lastKnownDay = state.currentDay
 
-		-- Check each container for respawn
 		for containerPart, data in pairs(LootContainers) do
 			if not containerPart.Parent then
 				LootContainers[containerPart] = nil
@@ -3559,9 +4347,7 @@ local function MarkContainerLooted(containerPart: BasePart)
 	data.respawnDay = lastKnownDay + Config.Loot.HouseRespawnDays
 end
 
--- Detect when all loot is taken from a container
 CollectionService:GetInstanceRemovedSignal("LootItem"):Connect(function(lootPart)
-	-- Check if the parent container is now empty
 	local parent = lootPart.Parent
 	if parent and LootContainers[parent] then
 		local hasLoot = false
@@ -3585,10 +4371,9 @@ task.defer(InitializeContainers)
 print("[LootService] Initialized")
 </ProtectedString>
         <bool name="Disabled">false</bool>
-        <token name="RunContext">0</token>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX0000002D">
+    <Item class="Script" referent="RBX0000002E">
       <Properties>
         <string name="Name">FortificationService</string>
         <ProtectedString name="Source">--[[
@@ -3977,10 +4762,9 @@ end
 print("[FortificationService] Initialized")
 </ProtectedString>
         <bool name="Disabled">false</bool>
-        <token name="RunContext">0</token>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX0000002E">
+    <Item class="Script" referent="RBX0000002F">
       <Properties>
         <string name="Name">ElectricityService</string>
         <ProtectedString name="Source">--[[
@@ -4222,10 +5006,9 @@ end
 print("[ElectricityService] Initialized")
 </ProtectedString>
         <bool name="Disabled">false</bool>
-        <token name="RunContext">0</token>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX0000002F">
+    <Item class="Script" referent="RBX00000030">
       <Properties>
         <string name="Name">PurgeService</string>
         <ProtectedString name="Source">--[[
@@ -4762,10 +5545,9 @@ end
 print("[PurgeService] Initialized")
 </ProtectedString>
         <bool name="Disabled">false</bool>
-        <token name="RunContext">0</token>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX00000030">
+    <Item class="Script" referent="RBX00000031">
       <Properties>
         <string name="Name">CookingService</string>
         <ProtectedString name="Source">--[[
@@ -5097,10 +5879,9 @@ end)
 print("[CookingService] Initialized")
 </ProtectedString>
         <bool name="Disabled">false</bool>
-        <token name="RunContext">0</token>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX00000031">
+    <Item class="Script" referent="RBX00000032">
       <Properties>
         <string name="Name">CombatService</string>
         <ProtectedString name="Source">--[[
@@ -5411,10 +6192,9 @@ end)
 print("[CombatService] Initialized")
 </ProtectedString>
         <bool name="Disabled">false</bool>
-        <token name="RunContext">0</token>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX00000032">
+    <Item class="Script" referent="RBX00000033">
       <Properties>
         <string name="Name">NPCService</string>
         <ProtectedString name="Source">--[[
@@ -5924,10 +6704,9 @@ end)
 print("[NPCService] Initialized")
 </ProtectedString>
         <bool name="Disabled">false</bool>
-        <token name="RunContext">0</token>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX00000033">
+    <Item class="Script" referent="RBX00000034">
       <Properties>
         <string name="Name">LobbyService</string>
         <ProtectedString name="Source">--[[
@@ -6231,10 +7010,9 @@ end)
 print("[LobbyService] Initialized")
 </ProtectedString>
         <bool name="Disabled">false</bool>
-        <token name="RunContext">0</token>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX00000034">
+    <Item class="Script" referent="RBX00000035">
       <Properties>
         <string name="Name">DataService</string>
         <ProtectedString name="Source">--[[
@@ -6619,10 +7397,9 @@ end
 print("[DataService] Initialized")
 </ProtectedString>
         <bool name="Disabled">false</bool>
-        <token name="RunContext">0</token>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX00000035">
+    <Item class="Script" referent="RBX00000036">
       <Properties>
         <string name="Name">MonetizationService</string>
         <ProtectedString name="Source">--[[
@@ -7121,10 +7898,9 @@ RefreshWeeklyShop()
 print("[MonetizationService] Initialized — Cosmetics only, no pay-to-win!")
 </ProtectedString>
         <bool name="Disabled">false</bool>
-        <token name="RunContext">0</token>
       </Properties>
     </Item>
-    <Item class="Script" referent="RBX00000036">
+    <Item class="Script" referent="RBX00000037">
       <Properties>
         <string name="Name">MapBuilder</string>
         <ProtectedString name="Source">--[[
@@ -7794,26 +8570,152 @@ local function CreateHouseLot(baseCFrame: CFrame, zone: number, houseIndex: numb
 	end
 
 	--------------------------------------------------------------------
-	-- LOOT CONTAINERS
+	-- INTERIOR FURNITURE (acts as loot containers)
 	--------------------------------------------------------------------
-	local lootContainerCount = zone == 1 and 2 or (zone == 2 and 3 or 4)
-	for i = 1, lootContainerCount do
-		local lootOffset = CFrame.new(
-			math.random(-w / 3, w / 3),
-			1.5,
-			math.random(-d / 3, d / 3)
-		)
+	local containerIdx = 0
+
+	-- Kitchen counter (back-left corner)
+	containerIdx = containerIdx + 1
+	CreatePart({
+		Name = "KitchenCounter",
+		Size = Vector3.new(w * 0.35, 2.5, 1.5),
+		CFrame = houseCF * CFrame.new(-w / 3, 1.25, d / 2 - 1.5),
+		Material = Enum.Material.Granite,
+		Color = Color3.fromRGB(160, 155, 148),
+		Parent = houseFolder,
+	})
+	-- Counter top surface (where items sit)
+	CreatePart({
+		Name = "CounterTop",
+		Size = Vector3.new(w * 0.35, 0.15, 1.5),
+		CFrame = houseCF * CFrame.new(-w / 3, 2.6, d / 2 - 1.5),
+		Material = Enum.Material.Marble,
+		Color = Color3.fromRGB(200, 195, 185),
+		Parent = houseFolder,
+		Tags = { "LootContainer" },
+		Attributes = { Zone = zone, ContainerIndex = containerIdx, FurnitureType = "Counter" },
+	})
+
+	-- Wall shelf on left wall
+	containerIdx = containerIdx + 1
+	CreatePart({
+		Name = "WallShelf_L",
+		Size = Vector3.new(0.6, 0.2, w * 0.25),
+		CFrame = houseCF * CFrame.new(-w / 2 + 0.8, 3.5, -d / 6),
+		Material = Enum.Material.Wood,
+		Color = Color3.fromRGB(130, 95, 60),
+		Parent = houseFolder,
+		Tags = { "LootContainer" },
+		Attributes = { Zone = zone, ContainerIndex = containerIdx, FurnitureType = "Shelf" },
+	})
+	-- Shelf brackets
+	for _, bOff in ipairs({ -1, 1 }) do
 		CreatePart({
-			Name = "LootContainer_" .. i,
-			Size = Vector3.new(3, 2, 2),
-			CFrame = houseCF * lootOffset,
-			Material = Enum.Material.WoodPlanks,
-			Color = Color3.fromRGB(90, 70, 50),
+			Name = "ShelfBracket",
+			Size = Vector3.new(0.1, 0.5, 0.15),
+			CFrame = houseCF * CFrame.new(-w / 2 + 0.8, 3.25, -d / 6 + bOff * (w * 0.1)),
+			Material = Enum.Material.Metal,
+			Color = Color3.fromRGB(80, 80, 85),
 			Parent = houseFolder,
-			Tags = { "LootContainer" },
-			Attributes = { Zone = zone, ContainerIndex = i },
 		})
 	end
+
+	-- Living room table (center of house)
+	containerIdx = containerIdx + 1
+	CreatePart({
+		Name = "TableTop",
+		Size = Vector3.new(3.5, 0.2, 2),
+		CFrame = houseCF * CFrame.new(w / 6, 2.2, 0),
+		Material = Enum.Material.Wood,
+		Color = Color3.fromRGB(120, 85, 50),
+		Parent = houseFolder,
+		Tags = { "LootContainer" },
+		Attributes = { Zone = zone, ContainerIndex = containerIdx, FurnitureType = "Table" },
+	})
+	-- Table legs
+	for _, lx in ipairs({ -1.4, 1.4 }) do
+		for _, lz in ipairs({ -0.7, 0.7 }) do
+			CreatePart({
+				Name = "TableLeg",
+				Size = Vector3.new(0.25, 2, 0.25),
+				CFrame = houseCF * CFrame.new(w / 6 + lx, 1, lz),
+				Material = Enum.Material.Wood,
+				Color = Color3.fromRGB(110, 75, 45),
+				Parent = houseFolder,
+			})
+		end
+	end
+
+	-- Wall shelf on right wall (Zone 2-3 get more furniture)
+	if zone &gt;= 2 then
+		containerIdx = containerIdx + 1
+		CreatePart({
+			Name = "WallShelf_R",
+			Size = Vector3.new(0.6, 0.2, w * 0.25),
+			CFrame = houseCF * CFrame.new(w / 2 - 0.8, 4, d / 6),
+			Material = Enum.Material.Wood,
+			Color = Color3.fromRGB(130, 95, 60),
+			Parent = houseFolder,
+			Tags = { "LootContainer" },
+			Attributes = { Zone = zone, ContainerIndex = containerIdx, FurnitureType = "Shelf" },
+		})
+	end
+
+	-- Bookshelf (Zone 3 gets a tall bookshelf)
+	if zone &gt;= 3 then
+		containerIdx = containerIdx + 1
+		CreatePart({
+			Name = "Bookshelf",
+			Size = Vector3.new(2.5, 5, 1),
+			CFrame = houseCF * CFrame.new(w / 3, 2.5, d / 2 - 1),
+			Material = Enum.Material.Wood,
+			Color = Color3.fromRGB(90, 60, 35),
+			Parent = houseFolder,
+		})
+		-- Shelf surfaces inside bookshelf
+		for shelfY = 1.5, 4.5, 1.5 do
+			CreatePart({
+				Name = "BookshelfShelf_" .. math.floor(shelfY),
+				Size = Vector3.new(2.3, 0.15, 0.8),
+				CFrame = houseCF * CFrame.new(w / 3, shelfY, d / 2 - 1),
+				Material = Enum.Material.Wood,
+				Color = Color3.fromRGB(100, 70, 40),
+				Parent = houseFolder,
+			})
+		end
+		-- Top shelf is the loot container
+		CreatePart({
+			Name = "BookshelfLoot",
+			Size = Vector3.new(2.3, 0.15, 0.8),
+			CFrame = houseCF * CFrame.new(w / 3, 3, d / 2 - 1),
+			Material = Enum.Material.Wood,
+			Color = Color3.fromRGB(100, 70, 40),
+			Parent = houseFolder,
+			Tags = { "LootContainer" },
+			Attributes = { Zone = zone, ContainerIndex = containerIdx, FurnitureType = "Bookshelf" },
+		})
+	end
+
+	-- Nightstand (small side table in all houses)
+	containerIdx = containerIdx + 1
+	CreatePart({
+		Name = "Nightstand",
+		Size = Vector3.new(1.2, 1.5, 1),
+		CFrame = houseCF * CFrame.new(w / 3, 0.75, -d / 3),
+		Material = Enum.Material.Wood,
+		Color = Color3.fromRGB(100, 70, 45),
+		Parent = houseFolder,
+	})
+	CreatePart({
+		Name = "NightstandTop",
+		Size = Vector3.new(1.3, 0.1, 1.1),
+		CFrame = houseCF * CFrame.new(w / 3, 1.55, -d / 3),
+		Material = Enum.Material.Wood,
+		Color = Color3.fromRGB(110, 80, 50),
+		Parent = houseFolder,
+		Tags = { "LootContainer" },
+		Attributes = { Zone = zone, ContainerIndex = containerIdx, FurnitureType = "Nightstand" },
+	})
 
 	-- Tag the house
 	if not isStarter then
@@ -8286,19 +9188,18 @@ end
 task.defer(BuildMap)
 </ProtectedString>
         <bool name="Disabled">false</bool>
-        <token name="RunContext">0</token>
       </Properties>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="RBX00000037">
+  <Item class="StarterPlayer" referent="RBX00000038">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="RBX00000038">
+    <Item class="Folder" referent="RBX00000039">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="RBX00000039">
+      <Item class="LocalScript" referent="RBX0000003A">
         <Properties>
           <string name="Name">UIController</string>
           <ProtectedString name="Source">--[[
@@ -8940,7 +9841,7 @@ print("[UIController] HUD Initialized")
           <bool name="Disabled">false</bool>
         </Properties>
       </Item>
-      <Item class="LocalScript" referent="RBX0000003A">
+      <Item class="LocalScript" referent="RBX0000003B">
         <Properties>
           <string name="Name">InputController</string>
           <ProtectedString name="Source">--[[
@@ -9149,17 +10050,18 @@ print("[InputController] Initialized")
           <bool name="Disabled">false</bool>
         </Properties>
       </Item>
-      <Item class="LocalScript" referent="RBX0000003B">
+      <Item class="LocalScript" referent="RBX0000003C">
         <Properties>
           <string name="Name">AtmosphereController</string>
           <ProtectedString name="Source">--[[
 	AtmosphereController.client.lua
-	Controls atmosphere, audio, and visual effects.
-	- Emergency broadcast siren
-	- Ambient audio (day vs night vs Purge)
-	- Generator hum / silence
-	- Heartbeat during danger
-	- Screen effects (blur, vignette, shake)
+	Full audio and visual effects system.
+	- Phase-based ambient audio (day, night, purge)
+	- Combat sounds (melee, ranged, impacts)
+	- Item pickup / UI sounds
+	- Environmental particles (rain, fog, fireflies)
+	- Screen effects (blur, vignette, shake, color grading)
+	- Generator hum / power events
 ]]
 
 local Players = game:GetService("Players")
@@ -9194,22 +10096,54 @@ local function CreateSound(name: string, soundId: string, properties)
 	sound.SoundId = soundId
 	sound.Volume = properties and properties.Volume or 0.5
 	sound.Looped = properties and properties.Looped or false
+	sound.RollOffMode = Enum.RollOffMode.InverseTapered
 	sound.Parent = SoundService
 	return sound
 end
 
--- Ambient sounds (using placeholder SoundIds — replace with real asset IDs)
+-- Ambient sounds (placeholder IDs - replace with real uploaded audio)
 local Sounds = {
-	-- These are placeholder rbxasset IDs. Replace with real uploaded sound IDs.
-	DayAmbient = CreateSound("DayAmbient", "rbxassetid://0", { Volume = 0.3, Looped = true }),
-	NightAmbient = CreateSound("NightAmbient", "rbxassetid://0", { Volume = 0.4, Looped = true }),
-	PurgeAmbient = CreateSound("PurgeAmbient", "rbxassetid://0", { Volume = 0.5, Looped = true }),
-	Siren = CreateSound("Siren", "rbxassetid://0", { Volume = 0.8, Looped = false }),
-	GeneratorHum = CreateSound("GeneratorHum", "rbxassetid://0", { Volume = 0.2, Looped = true }),
-	Heartbeat = CreateSound("Heartbeat", "rbxassetid://0", { Volume = 0.6, Looped = true }),
-	PowerDown = CreateSound("PowerDown", "rbxassetid://0", { Volume = 0.7, Looped = false }),
-	PurgeHorn = CreateSound("PurgeHorn", "rbxassetid://0", { Volume = 0.9, Looped = false }),
+	-- Phase ambience
+	DayAmbient     = CreateSound("DayAmbient", "rbxassetid://0", { Volume = 0.3, Looped = true }),
+	NightAmbient   = CreateSound("NightAmbient", "rbxassetid://0", { Volume = 0.4, Looped = true }),
+	PurgeAmbient   = CreateSound("PurgeAmbient", "rbxassetid://0", { Volume = 0.5, Looped = true }),
+
+	-- Events
+	Siren          = CreateSound("Siren", "rbxassetid://0", { Volume = 0.8, Looped = false }),
+	PurgeHorn      = CreateSound("PurgeHorn", "rbxassetid://0", { Volume = 0.9, Looped = false }),
 	VictoryStinger = CreateSound("VictoryStinger", "rbxassetid://0", { Volume = 0.7, Looped = false }),
+
+	-- Generator
+	GeneratorHum   = CreateSound("GeneratorHum", "rbxassetid://0", { Volume = 0.2, Looped = true }),
+	PowerDown      = CreateSound("PowerDown", "rbxassetid://0", { Volume = 0.7, Looped = false }),
+
+	-- Danger
+	Heartbeat      = CreateSound("Heartbeat", "rbxassetid://0", { Volume = 0.6, Looped = true }),
+
+	-- Combat
+	MeleeSwing     = CreateSound("MeleeSwing", "rbxassetid://0", { Volume = 0.5, Looped = false }),
+	MeleeHit       = CreateSound("MeleeHit", "rbxassetid://0", { Volume = 0.6, Looped = false }),
+	GunShot        = CreateSound("GunShot", "rbxassetid://0", { Volume = 0.7, Looped = false }),
+	ShotgunBlast   = CreateSound("ShotgunBlast", "rbxassetid://0", { Volume = 0.8, Looped = false }),
+	RifleShot      = CreateSound("RifleShot", "rbxassetid://0", { Volume = 0.7, Looped = false }),
+	BulletImpact   = CreateSound("BulletImpact", "rbxassetid://0", { Volume = 0.4, Looped = false }),
+	EnemyHurt      = CreateSound("EnemyHurt", "rbxassetid://0", { Volume = 0.5, Looped = false }),
+	PlayerHurt     = CreateSound("PlayerHurt", "rbxassetid://0", { Volume = 0.6, Looped = false }),
+
+	-- UI / Interaction
+	ItemPickup     = CreateSound("ItemPickup", "rbxassetid://0", { Volume = 0.4, Looped = false }),
+	ItemEquip      = CreateSound("ItemEquip", "rbxassetid://0", { Volume = 0.3, Looped = false }),
+	Notification   = CreateSound("Notification", "rbxassetid://0", { Volume = 0.3, Looped = false }),
+	FortifyHammer  = CreateSound("FortifyHammer", "rbxassetid://0", { Volume = 0.5, Looped = false }),
+	DoorCreak      = CreateSound("DoorCreak", "rbxassetid://0", { Volume = 0.4, Looped = false }),
+	CookingFire    = CreateSound("CookingFire", "rbxassetid://0", { Volume = 0.3, Looped = true }),
+
+	-- Environment
+	WindLoop       = CreateSound("WindLoop", "rbxassetid://0", { Volume = 0.15, Looped = true }),
+	BirdsChirp     = CreateSound("BirdsChirp", "rbxassetid://0", { Volume = 0.2, Looped = true }),
+	CricketsNight  = CreateSound("CricketsNight", "rbxassetid://0", { Volume = 0.2, Looped = true }),
+	ThunderRumble  = CreateSound("ThunderRumble", "rbxassetid://0", { Volume = 0.7, Looped = false }),
+	RainLoop       = CreateSound("RainLoop", "rbxassetid://0", { Volume = 0.3, Looped = true }),
 }
 
 ------------------------------------------------------------------------
@@ -9229,13 +10163,72 @@ colorCorrection.Saturation = 0
 colorCorrection.TintColor = Color3.new(1, 1, 1)
 colorCorrection.Parent = Lighting
 
-local vignette = Instance.new("ColorCorrectionEffect")
-vignette.Name = "DangerVignette"
-vignette.Brightness = 0
-vignette.Contrast = 0
-vignette.Saturation = 0
-vignette.TintColor = Color3.new(1, 1, 1)
-vignette.Parent = Lighting
+local dangerVignette = Instance.new("ColorCorrectionEffect")
+dangerVignette.Name = "DangerVignette"
+dangerVignette.Brightness = 0
+dangerVignette.Contrast = 0
+dangerVignette.Saturation = 0
+dangerVignette.TintColor = Color3.new(1, 1, 1)
+dangerVignette.Parent = Lighting
+
+-- Atmosphere for fog/weather
+local atmosphere = Instance.new("Atmosphere")
+atmosphere.Name = "WeatherAtmosphere"
+atmosphere.Density = 0.15
+atmosphere.Offset = 0
+atmosphere.Color = Color3.fromRGB(199, 199, 199)
+atmosphere.Decay = Color3.fromRGB(92, 60, 13)
+atmosphere.Glare = 0
+atmosphere.Haze = 0
+atmosphere.Parent = Lighting
+
+-- Sun rays for daytime
+local sunRays = Instance.new("SunRaysEffect")
+sunRays.Name = "SunRays"
+sunRays.Intensity = 0.03
+sunRays.Spread = 0.5
+sunRays.Parent = Lighting
+
+------------------------------------------------------------------------
+-- Particle Systems (attached to camera or workspace)
+------------------------------------------------------------------------
+local rainEmitter = nil
+
+local function CreateRainEffect()
+	if rainEmitter then return end
+
+	-- Create a part high above the player for rain
+	local rainPart = Instance.new("Part")
+	rainPart.Name = "RainEmitter"
+	rainPart.Size = Vector3.new(100, 1, 100)
+	rainPart.Transparency = 1
+	rainPart.CanCollide = false
+	rainPart.Anchored = true
+	rainPart.Position = Vector3.new(0, 80, 0)
+	rainPart.Parent = workspace
+
+	rainEmitter = Instance.new("ParticleEmitter")
+	rainEmitter.Name = "Rain"
+	rainEmitter.Rate = 200
+	rainEmitter.Lifetime = NumberRange.new(1, 2)
+	rainEmitter.Speed = NumberRange.new(40, 60)
+	rainEmitter.SpreadAngle = Vector2.new(5, 5)
+	rainEmitter.Size = NumberSequence.new(0.05, 0.05)
+	rainEmitter.Color = ColorSequence.new(Color3.fromRGB(160, 170, 190))
+	rainEmitter.Transparency = NumberSequence.new(0.3, 0.7)
+	rainEmitter.LightEmission = 0.1
+	rainEmitter.EmissionDirection = Enum.NormalId.Bottom
+	rainEmitter.Enabled = false
+	rainEmitter.Parent = rainPart
+
+	-- Follow player
+	RunService.Heartbeat:Connect(function()
+		local char = Player.Character
+		if char and char:FindFirstChild("HumanoidRootPart") then
+			rainPart.Position = char.HumanoidRootPart.Position + Vector3.new(0, 60, 0)
+		end
+	end)
+end
 
 ------------------------------------------------------------------------
 -- State
@@ -9265,7 +10258,6 @@ local function ApplyCameraShake(dt)
 		camera.CFrame = camera.CFrame * shakeOffset
 	end
 
-	-- Decay
 	CameraShakeIntensity = CameraShakeIntensity * 0.95
 	if CameraShakeIntensity &lt; 0.01 then
 		CameraShakeIntensity = 0
@@ -9275,11 +10267,23 @@ end
 ------------------------------------------------------------------------
 -- Atmosphere Transitions
 ------------------------------------------------------------------------
+local function StopAllAmbient()
+	Sounds.DayAmbient:Stop()
+	Sounds.NightAmbient:Stop()
+	Sounds.PurgeAmbient:Stop()
+	Sounds.BirdsChirp:Stop()
+	Sounds.CricketsNight:Stop()
+	Sounds.RainLoop:Stop()
+	if rainEmitter then rainEmitter.Enabled = false end
+end
+
 local function TransitionToDay()
+	StopAllAmbient()
+
 	TweenService:Create(colorCorrection, TweenInfo.new(3), {
 		Brightness = 0,
 		Contrast = 0,
-		Saturation = 0,
+		Saturation = 0.05,
 		TintColor = Color3.new(1, 1, 1),
 	}):Play()
 
@@ -9287,48 +10291,125 @@ local function TransitionToDay()
 		Size = 0,
 	}):Play()
 
-	Sounds.NightAmbient:Stop()
-	Sounds.PurgeAmbient:Stop()
+	TweenService:Create(atmosphere, TweenInfo.new(3), {
+		Density = 0.15,
+		Haze = 0,
+	}):Play()
+
+	sunRays.Intensity = 0.03
+
 	Sounds.DayAmbient:Play()
+	Sounds.BirdsChirp:Play()
+	Sounds.WindLoop:Play()
 end
 
 local function TransitionToNight()
+	StopAllAmbient()
+
 	TweenService:Create(colorCorrection, TweenInfo.new(3), {
 		Brightness = -0.05,
 		Contrast = 0.1,
 		Saturation = -0.2,
-		TintColor = Color3.fromRGB(200, 210, 255),
+		TintColor = Color3.fromRGB(190, 200, 240),
 	}):Play()
 
-	Sounds.DayAmbient:Stop()
+	TweenService:Create(atmosphere, TweenInfo.new(3), {
+		Density = 0.25,
+		Haze = 1.5,
+	}):Play()
+
+	sunRays.Intensity = 0
+
 	Sounds.NightAmbient:Play()
+	Sounds.CricketsNight:Play()
+	Sounds.WindLoop:Play()
 end
 
 local function TransitionToPurge()
-	-- Dramatic red tint
+	StopAllAmbient()
+	CreateRainEffect()
+
+	-- Dramatic red tint, heavy atmosphere
 	TweenService:Create(colorCorrection, TweenInfo.new(1), {
 		Brightness = -0.1,
-		Contrast = 0.2,
-		Saturation = -0.3,
-		TintColor = Color3.fromRGB(255, 180, 180),
+		Contrast = 0.25,
+		Saturation = -0.4,
+		TintColor = Color3.fromRGB(255, 160, 160),
 	}):Play()
 
-	Sounds.DayAmbient:Stop()
-	Sounds.NightAmbient:Stop()
-	Sounds.PurgeAmbient:Play()
+	TweenService:Create(atmosphere, TweenInfo.new(2), {
+		Density = 0.4,
+		Haze = 3,
+	}):Play()
 
-	CameraShakeIntensity = 0.3
+	TweenService:Create(blur, TweenInfo.new(0.5), {
+		Size = 2,
+	}):Play()
+
+	-- Flash effect at purge start
+	TweenService:Create(dangerVignette, TweenInfo.new(0.3), {
+		Brightness = 0.3,
+		TintColor = Color3.fromRGB(255, 100, 100),
+	}):Play()
+	task.delay(0.5, function()
+		TweenService:Create(dangerVignette, TweenInfo.new(1), {
+			Brightness = 0,
+			TintColor = Color3.new(1, 1, 1),
+		}):Play()
+	end)
+
+	sunRays.Intensity = 0
+
+	-- Rain during purge
+	if rainEmitter then
+		rainEmitter.Enabled = true
+	end
+	Sounds.RainLoop:Play()
+	Sounds.PurgeAmbient:Play()
+	Sounds.WindLoop:Play()
+	Sounds.WindLoop.Volume = 0.35  -- louder wind during purge
+
+	CameraShakeIntensity = 0.4
+
+	-- Thunder rumbles at intervals during purge
+	task.spawn(function()
+		while CurrentPhase == Enums.GamePhase.Purge do
+			task.wait(math.random(8, 20))
+			if CurrentPhase ~= Enums.GamePhase.Purge then break end
+			Sounds.ThunderRumble:Play()
+			CameraShakeIntensity = math.max(CameraShakeIntensity, 0.15)
+			-- Lightning flash
+			TweenService:Create(dangerVignette, TweenInfo.new(0.1), {
+				Brightness = 0.4,
+			}):Play()
+			task.wait(0.15)
+			TweenService:Create(dangerVignette, TweenInfo.new(0.5), {
+				Brightness = 0,
+			}):Play()
+		end
+	end)
 end
 
 local function TransitionToPostPurge()
+	StopAllAmbient()
+
 	TweenService:Create(colorCorrection, TweenInfo.new(3), {
-		Brightness = 0,
+		Brightness = 0.05,
 		Contrast = 0,
-		Saturation = 0,
-		TintColor = Color3.new(1, 1, 1),
+		Saturation = 0.1,
+		TintColor = Color3.fromRGB(255, 240, 220),
 	}):Play()
 
-	Sounds.PurgeAmbient:Stop()
+	TweenService:Create(blur, TweenInfo.new(2), {
+		Size = 0,
+	}):Play()
+
+	TweenService:Create(atmosphere, TweenInfo.new(3), {
+		Density = 0.15,
+		Haze = 0,
+	}):Play()
+
+	Sounds.WindLoop.Volume = 0.15
 	Sounds.Heartbeat:Stop()
 	Sounds.VictoryStinger:Play()
 end
@@ -9341,15 +10422,12 @@ local function OnPowerOut()
 	Sounds.GeneratorHum:Stop()
 	Sounds.PowerDown:Play()
 
-	-- Sudden darkness
 	TweenService:Create(colorCorrection, TweenInfo.new(0.2), {
 		Brightness = -0.3,
 		TintColor = Color3.fromRGB(100, 100, 130),
 	}):Play()
 
-	-- Start heartbeat
 	Sounds.Heartbeat:Play()
-
 	CameraShakeIntensity = 0.5
 end
 
@@ -9376,6 +10454,10 @@ local function UpdateStarvingEffects(hungerLevel)
 			TweenService:Create(blur, TweenInfo.new(1), {
 				Size = 6,
 			}):Play()
+			TweenService:Create(dangerVignette, TweenInfo.new(1), {
+				Saturation = -0.5,
+				TintColor = Color3.fromRGB(200, 200, 180),
+			}):Play()
 			CameraShakeIntensity = math.max(CameraShakeIntensity, 0.15)
 		end
 	else
@@ -9384,9 +10466,73 @@ local function UpdateStarvingEffects(hungerLevel)
 			TweenService:Create(blur, TweenInfo.new(1), {
 				Size = 0,
 			}):Play()
+			TweenService:Create(dangerVignette, TweenInfo.new(1), {
+				Saturation = 0,
+				TintColor = Color3.new(1, 1, 1),
+			}):Play()
 		end
 	end
 end
+
+------------------------------------------------------------------------
+-- Combat Effect Helpers (called from other controllers)
+------------------------------------------------------------------------
+-- Store these globally so InputController can call them
+local CombatEffects = {}
+
+function CombatEffects.PlayMeleeSwing()
+	Sounds.MeleeSwing:Play()
+end
+
+function CombatEffects.PlayMeleeHit()
+	Sounds.MeleeHit:Play()
+	CameraShakeIntensity = math.max(CameraShakeIntensity, 0.1)
+end
+
+function CombatEffects.PlayGunshot(weaponType)
+	if weaponType == "Shotgun" then
+		Sounds.ShotgunBlast:Play()
+		CameraShakeIntensity = math.max(CameraShakeIntensity, 0.25)
+	elseif weaponType == "Rifle" then
+		Sounds.RifleShot:Play()
+		CameraShakeIntensity = math.max(CameraShakeIntensity, 0.15)
+	else
+		Sounds.GunShot:Play()
+		CameraShakeIntensity = math.max(CameraShakeIntensity, 0.1)
+	end
+end
+
+function CombatEffects.PlayEnemyHurt()
+	Sounds.EnemyHurt:Play()
+end
+
+function CombatEffects.PlayItemPickup()
+	Sounds.ItemPickup:Play()
+end
+
+function CombatEffects.PlayNotification()
+	Sounds.Notification:Play()
+end
+
+function CombatEffects.PlayFortify()
+	Sounds.FortifyHammer:Play()
+end
+
+-- Make combat effects available to other client scripts
+local combatModule = Instance.new("BindableEvent")
+combatModule.Name = "PlayCombatSound"
+combatModule.Parent = ReplicatedStorage
+
+combatModule.Event:Connect(function(soundType, param)
+	if soundType == "MeleeSwing" then CombatEffects.PlayMeleeSwing()
+	elseif soundType == "MeleeHit" then CombatEffects.PlayMeleeHit()
+	elseif soundType == "Gunshot" then CombatEffects.PlayGunshot(param)
+	elseif soundType == "EnemyHurt" then CombatEffects.PlayEnemyHurt()
+	elseif soundType == "ItemPickup" then CombatEffects.PlayItemPickup()
+	elseif soundType == "Notification" then CombatEffects.PlayNotification()
+	elseif soundType == "Fortify" then CombatEffects.PlayFortify()
+	end
+end)
 
 ------------------------------------------------------------------------
 -- Event Handlers
@@ -9408,7 +10554,7 @@ end)
 PurgeSiren.OnClientEvent:Connect(function()
 	Sounds.Siren:Play()
 	Sounds.PurgeHorn:Play()
-	CameraShakeIntensity = 0.2
+	CameraShakeIntensity = 0.3
 end)
 
 PurgeStarted.OnClientEvent:Connect(function()
@@ -9433,7 +10579,23 @@ UpdateHUD.OnClientEvent:Connect(function(updateType, data)
 	elseif updateType == "HungerUpdate" then
 		UpdateStarvingEffects(data.level)
 	elseif updateType == "DamageTaken" then
-		CameraShakeIntensity = math.max(CameraShakeIntensity, 0.3)
+		CameraShakeIntensity = math.max(CameraShakeIntensity, 0.35)
+		Sounds.PlayerHurt:Play()
+
+		-- Danger vignette flash (red edges)
+		TweenService:Create(dangerVignette, TweenInfo.new(0.1), {
+			Brightness = -0.1,
+			Contrast = 0.3,
+			TintColor = Color3.fromRGB(255, 150, 150),
+		}):Play()
+		task.delay(0.3, function()
+			TweenService:Create(dangerVignette, TweenInfo.new(0.5), {
+				Brightness = 0,
+				Contrast = 0,
+				TintColor = Color3.new(1, 1, 1),
+			}):Play()
+		end)
+
 		IsInDanger = true
 		Sounds.Heartbeat:Play()
 		task.delay(3, function()
@@ -9442,6 +10604,13 @@ UpdateHUD.OnClientEvent:Connect(function(updateType, data)
 				Sounds.Heartbeat:Stop()
 			end
 		end)
+
+	elseif updateType == "InventoryUpdate" then
+		-- Item pickup sound
+		Sounds.ItemPickup:Play()
+
+	elseif updateType == "FortificationUpdate" then
+		Sounds.FortifyHammer:Play()
 	end
 end)
 
@@ -9477,11 +10646,12 @@ PlayerRevived.OnClientEvent:Connect(function(revivedPlayer)
 end)
 
 ------------------------------------------------------------------------
--- Generator Hum (start when game begins)
+-- Generator Hum
 ------------------------------------------------------------------------
 task.defer(function()
 	task.wait(2)
 	Sounds.GeneratorHum:Play()
+	Sounds.WindLoop:Play()
 end)
 
 ------------------------------------------------------------------------
@@ -9491,12 +10661,12 @@ RunService.RenderStepped:Connect(function(dt)
 	ApplyCameraShake(dt)
 end)
 
-print("[AtmosphereController] Initialized")
+print("[AtmosphereController] Initialized with full audio/visual effects")
 </ProtectedString>
           <bool name="Disabled">false</bool>
         </Properties>
       </Item>
-      <Item class="LocalScript" referent="RBX0000003C">
+      <Item class="LocalScript" referent="RBX0000003D">
         <Properties>
           <string name="Name">InteractionController</string>
           <ProtectedString name="Source">--[[
@@ -9832,7 +11002,7 @@ print("[InteractionController] Initialized")
           <bool name="Disabled">false</bool>
         </Properties>
       </Item>
-      <Item class="LocalScript" referent="RBX0000003D">
+      <Item class="LocalScript" referent="RBX0000003E">
         <Properties>
           <string name="Name">LobbyUI</string>
           <ProtectedString name="Source">--[[
@@ -10101,17 +11271,17 @@ print("[LobbyUI] Initialized")
       </Item>
     </Item>
   </Item>
-  <Item class="ServerStorage" referent="RBX0000003E">
+  <Item class="ServerStorage" referent="RBX0000003F">
     <Properties>
       <string name="Name">ServerStorage</string>
     </Properties>
   </Item>
-  <Item class="SoundService" referent="RBX0000003F">
+  <Item class="SoundService" referent="RBX00000040">
     <Properties>
       <string name="Name">SoundService</string>
     </Properties>
   </Item>
-  <Item class="StarterGui" referent="RBX00000040">
+  <Item class="StarterGui" referent="RBX00000041">
     <Properties>
       <string name="Name">StarterGui</string>
     </Properties>

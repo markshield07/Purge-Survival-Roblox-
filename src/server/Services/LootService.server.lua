@@ -1,7 +1,8 @@
 --[[
 	LootService.server.lua
 	Manages loot spawning in houses throughout the neighborhood.
-	Each house has loot containers that respawn on a day-cycle timer.
+	Items visually look like what they are (cans, weapons, tools, etc.)
+	and are placed on furniture surfaces (shelves, tables, counters).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,28 +14,33 @@ local Modules = Shared:WaitForChild("Modules")
 local Config = require(Modules.Config)
 local Enums = require(Modules.Enums)
 local ItemDatabase = require(Modules.ItemDatabase)
+local ItemVisuals = require(Modules.ItemVisuals)
 local Utils = require(Modules.Utils)
 
 ------------------------------------------------------------------------
 -- Loot Container Registry
 ------------------------------------------------------------------------
--- Each house/location in the map should have parts tagged "LootContainer"
--- with attributes: Zone (1-3), LocationType (string), ContainerIndex (number)
-
 local LootContainers = {}  -- [containerPart] = { zone, items, lastLooted, respawnDay }
 
 ------------------------------------------------------------------------
--- Spawn Loot for a Container
+-- Part shape helper
+------------------------------------------------------------------------
+local ShapeMap = {
+	Block = Enum.PartType.Block,
+	Cylinder = Enum.PartType.Cylinder,
+	Ball = Enum.PartType.Ball,
+}
+
+------------------------------------------------------------------------
+-- Generate Loot for a Container
 ------------------------------------------------------------------------
 local function GenerateLootForContainer(zone: number, locationType: string?): { any }
 	local maxItems = Config.Loot.MaxItemsPerHouse[zone] or 4
 	local itemCount = math.random(math.ceil(maxItems * 0.5), maxItems)
 
-	-- Get loot pool
 	local pool
 	if locationType and ItemDatabase.BonusLoot[locationType] then
 		pool = ItemDatabase.BonusLoot[locationType]
-		-- Apply bonus multiplier
 		local mult = Config.Loot.BonusMultiplier[locationType] or 1
 		itemCount = math.floor(itemCount * mult)
 	else
@@ -45,14 +51,11 @@ local function GenerateLootForContainer(zone: number, locationType: string?): { 
 	local tierWeights = Config.Loot.TierWeights[zone] or Config.Loot.TierWeights[1]
 
 	for _ = 1, itemCount do
-		-- Pick a random item from the pool
 		local itemId = pool[math.random(1, #pool)]
 		local itemData = ItemDatabase.GetItem(itemId)
 
 		if itemData then
-			-- Check if item tier matches zone tier weights
 			local targetTier = Utils.PickTier(tierWeights)
-			-- Allow the item if its tier matches or is lower than target
 			local tierOrder = { Common = 1, Uncommon = 2, Rare = 3, Epic = 4 }
 			local itemTierOrder = tierOrder[itemData.tier] or 1
 			local targetTierOrder = tierOrder[targetTier] or 1
@@ -74,7 +77,118 @@ local function GenerateLootForContainer(zone: number, locationType: string?): { 
 end
 
 ------------------------------------------------------------------------
--- Create Physical Loot Items in a Container
+-- Create a single loot item Part with proper visuals
+------------------------------------------------------------------------
+local function CreateLootPart(item, itemData, position: CFrame, parent)
+	local visual = ItemVisuals.GetVisual(item.itemId, itemData.category)
+
+	local lootPart = Instance.new("Part")
+	lootPart.Name = "Loot_" .. item.itemId
+	lootPart.Size = visual.size
+	lootPart.Anchored = true
+	lootPart.CanCollide = false
+	lootPart.Material = visual.material
+	lootPart.Color = visual.color
+	lootPart.Transparency = visual.transparency or 0
+
+	-- Apply shape
+	local shape = ShapeMap[visual.shape]
+	if shape then
+		lootPart.Shape = shape
+	end
+
+	lootPart.CFrame = position
+
+	-- Set item data as attributes
+	lootPart:SetAttribute("ItemId", item.itemId)
+	lootPart:SetAttribute("Quantity", item.quantity)
+	lootPart:SetAttribute("ItemName", itemData.name)
+	lootPart:SetAttribute("ItemTier", itemData.tier)
+
+	CollectionService:AddTag(lootPart, "LootItem")
+
+	-- Glow effect for rare/special items
+	if visual.glow then
+		local glow = Instance.new("PointLight")
+		glow.Color = visual.glow
+		glow.Range = 4
+		glow.Brightness = 0.6
+		glow.Parent = lootPart
+	end
+
+	-- Tier-colored sparkle for Rare+ items
+	local tierOrder = { Common = 1, Uncommon = 2, Rare = 3, Epic = 4 }
+	if (tierOrder[itemData.tier] or 1) >= 3 then
+		local sparkle = Instance.new("ParticleEmitter")
+		sparkle.Name = "TierSparkle"
+		sparkle.Rate = 3
+		sparkle.Lifetime = NumberRange.new(0.5, 1)
+		sparkle.Speed = NumberRange.new(0.5, 1)
+		sparkle.SpreadAngle = Vector2.new(180, 180)
+		sparkle.Size = NumberSequence.new(0.15, 0)
+		sparkle.LightEmission = 1
+		sparkle.Color = ColorSequence.new(Enums.TierColor[itemData.tier] or Color3.new(1, 1, 1))
+		sparkle.Parent = lootPart
+	end
+
+	-- Billboard label (name + quantity)
+	local tierColor = Enums.TierColor[itemData.tier]
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Size = UDim2.new(0, 150, 0, 45)
+	billboard.StudsOffset = Vector3.new(0, 1.2, 0)
+	billboard.AlwaysOnTop = false
+	billboard.MaxDistance = 16
+	billboard.Parent = lootPart
+
+	-- Background frame for readability
+	local bgFrame = Instance.new("Frame")
+	bgFrame.Size = UDim2.new(1, 0, 1, 0)
+	bgFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+	bgFrame.BackgroundTransparency = 0.5
+	bgFrame.BorderSizePixel = 0
+	bgFrame.Parent = billboard
+
+	local bgCorner = Instance.new("UICorner")
+	bgCorner.CornerRadius = UDim.new(0, 4)
+	bgCorner.Parent = bgFrame
+
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Size = UDim2.new(1, -4, 0.65, 0)
+	nameLabel.Position = UDim2.new(0, 2, 0, 0)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Text = itemData.name
+	nameLabel.TextColor3 = tierColor or Color3.new(1, 1, 1)
+	nameLabel.TextScaled = true
+	nameLabel.Font = Enum.Font.GothamBold
+	nameLabel.Parent = bgFrame
+
+	if item.quantity > 1 then
+		local quantityLabel = Instance.new("TextLabel")
+		quantityLabel.Size = UDim2.new(1, -4, 0.35, 0)
+		quantityLabel.Position = UDim2.new(0, 2, 0.65, 0)
+		quantityLabel.BackgroundTransparency = 1
+		quantityLabel.Text = "x" .. item.quantity
+		quantityLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+		quantityLabel.TextScaled = true
+		quantityLabel.Font = Enum.Font.Gotham
+		quantityLabel.Parent = bgFrame
+	end
+
+	-- Proximity prompt for pickup
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "Pick Up"
+	prompt.ObjectText = itemData.name
+	prompt.MaxActivationDistance = Config.Player.PickupRange
+	prompt.HoldDuration = 0.2
+	prompt.Parent = lootPart
+
+	lootPart.Parent = parent
+	return lootPart
+end
+
+------------------------------------------------------------------------
+-- Spawn Loot in a Container (furniture surface)
 ------------------------------------------------------------------------
 local function SpawnLootInContainer(containerPart: BasePart, items: { any })
 	-- Clear existing loot
@@ -84,74 +198,39 @@ local function SpawnLootInContainer(containerPart: BasePart, items: { any })
 		end
 	end
 
+	local containerSize = containerPart.Size
+	local containerCF = containerPart.CFrame
+
 	for i, item in ipairs(items) do
 		local itemData = ItemDatabase.GetItem(item.itemId)
 		if not itemData then continue end
 
-		local lootPart = Instance.new("Part")
-		lootPart.Name = "Loot_" .. item.itemId
-		lootPart.Size = Vector3.new(1, 1, 1)
-		lootPart.Anchored = true
-		lootPart.CanCollide = false
+		local visual = ItemVisuals.GetVisual(item.itemId, itemData.category)
 
-		-- Position loot items inside the container spread out
-		local offset = Vector3.new(
-			(i - 1) % 3 * 1.5 - 1.5,
-			0.5,
-			math.floor((i - 1) / 3) * 1.5
-		)
-		lootPart.CFrame = containerPart.CFrame * CFrame.new(offset)
+		-- Spread items across the furniture surface
+		local maxPerRow = math.max(1, math.floor(containerSize.X / 1.2))
+		local row = math.floor((i - 1) / maxPerRow)
+		local col = (i - 1) % maxPerRow
 
-		-- Color by tier
-		local tierColor = Enums.TierColor[itemData.tier]
-		if tierColor then
-			lootPart.Color = tierColor
-		end
+		local xSpread = containerSize.X * 0.8
+		local zSpread = containerSize.Z * 0.6
+		local xStart = -xSpread / 2
+		local zStart = -zSpread / 2
 
-		-- Set item data as attributes
-		lootPart:SetAttribute("ItemId", item.itemId)
-		lootPart:SetAttribute("Quantity", item.quantity)
-		lootPart:SetAttribute("ItemName", itemData.name)
-		lootPart:SetAttribute("ItemTier", itemData.tier)
+		local xStep = maxPerRow > 1 and (xSpread / (maxPerRow - 1)) or 0
+		local zStep = 1.2
 
-		CollectionService:AddTag(lootPart, "LootItem")
+		local localX = maxPerRow > 1 and (xStart + col * xStep) or 0
+		local localZ = zStart + row * zStep
+		local localY = containerSize.Y / 2 + visual.size.Y / 2 + 0.05
 
-		-- Billboard label
-		local billboard = Instance.new("BillboardGui")
-		billboard.Size = UDim2.new(0, 140, 0, 40)
-		billboard.StudsOffset = Vector3.new(0, 1.5, 0)
-		billboard.AlwaysOnTop = false
-		billboard.MaxDistance = 20
-		billboard.Parent = lootPart
+		local itemCF = containerCF * CFrame.new(localX, localY, localZ)
 
-		local nameLabel = Instance.new("TextLabel")
-		nameLabel.Size = UDim2.new(1, 0, 0.6, 0)
-		nameLabel.BackgroundTransparency = 1
-		nameLabel.Text = itemData.name
-		nameLabel.TextColor3 = tierColor or Color3.new(1, 1, 1)
-		nameLabel.TextScaled = true
-		nameLabel.Font = Enum.Font.GothamBold
-		nameLabel.Parent = billboard
+		-- Slight random rotation for natural look
+		local yRot = math.rad(math.random(-15, 15))
+		itemCF = itemCF * CFrame.Angles(0, yRot, 0)
 
-		local quantityLabel = Instance.new("TextLabel")
-		quantityLabel.Size = UDim2.new(1, 0, 0.4, 0)
-		quantityLabel.Position = UDim2.new(0, 0, 0.6, 0)
-		quantityLabel.BackgroundTransparency = 1
-		quantityLabel.Text = item.quantity > 1 and ("x" .. item.quantity) or ""
-		quantityLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-		quantityLabel.TextScaled = true
-		quantityLabel.Font = Enum.Font.Gotham
-		quantityLabel.Parent = billboard
-
-		-- Proximity prompt for pickup
-		local prompt = Instance.new("ProximityPrompt")
-		prompt.ActionText = "Pick Up"
-		prompt.ObjectText = itemData.name
-		prompt.MaxActivationDistance = Config.Player.PickupRange
-		prompt.HoldDuration = 0.3
-		prompt.Parent = lootPart
-
-		lootPart.Parent = containerPart
+		CreateLootPart(item, itemData, itemCF, containerPart)
 	end
 end
 
@@ -177,7 +256,7 @@ local function InitializeContainers()
 		}
 	end
 
-	print("[LootService] Initialized " .. #containers .. " loot containers")
+	print("[LootService] Initialized " .. #containers .. " loot containers with visual items")
 end
 
 ------------------------------------------------------------------------
@@ -200,14 +279,9 @@ CollectionService:GetInstanceAddedSignal("LootContainer"):Connect(function(conta
 end)
 
 ------------------------------------------------------------------------
--- Loot Respawn Check (triggered by DayChanged event)
+-- Loot Respawn Check
 ------------------------------------------------------------------------
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
-local DayChanged = Remotes:WaitForChild("DayChanged")
-
--- Listen for day changes to handle respawns
--- We use a BindableEvent since DayChanged is a RemoteEvent (client-facing)
--- Instead, we'll poll the game state periodically
 local lastKnownDay = 0
 
 RunService.Heartbeat:Connect(function()
@@ -220,7 +294,6 @@ RunService.Heartbeat:Connect(function()
 	if state.currentDay > lastKnownDay then
 		lastKnownDay = state.currentDay
 
-		-- Check each container for respawn
 		for containerPart, data in pairs(LootContainers) do
 			if not containerPart.Parent then
 				LootContainers[containerPart] = nil
@@ -248,9 +321,7 @@ local function MarkContainerLooted(containerPart: BasePart)
 	data.respawnDay = lastKnownDay + Config.Loot.HouseRespawnDays
 end
 
--- Detect when all loot is taken from a container
 CollectionService:GetInstanceRemovedSignal("LootItem"):Connect(function(lootPart)
-	-- Check if the parent container is now empty
 	local parent = lootPart.Parent
 	if parent and LootContainers[parent] then
 		local hasLoot = false
