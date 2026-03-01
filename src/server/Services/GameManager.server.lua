@@ -60,6 +60,11 @@ local RequestGameState = CreateRemote("RequestGameState", "RemoteFunction")
 local UpdateHUD = CreateRemote("UpdateHUD", "RemoteEvent")
 
 ------------------------------------------------------------------------
+-- Forward declarations
+------------------------------------------------------------------------
+local SyncPowerValue  -- defined at end, after ReplicatedStorage value is created
+
+------------------------------------------------------------------------
 -- Game State
 ------------------------------------------------------------------------
 local GameState = {
@@ -354,6 +359,7 @@ local function UpdateGenerator(dt: number)
 			gen.poweredSystems[systemName] = false
 		end
 
+		SyncPowerValue()
 		UpdateHUD:FireAllClients("PowerStatus", false)
 		TriggerPowerOutAttack()
 	end
@@ -589,6 +595,7 @@ RefuelRequest.OnServerEvent:Connect(function(player, fuelItemIndex)
 	if not gen.isPowered and gen.fuel > 0 then
 		gen.isPowered = true
 		gen.poweredSystems.Lights = true
+		SyncPowerValue()
 		UpdateHUD:FireAllClients("PowerStatus", true)
 
 		-- If power-out attack was happening, end it
@@ -1002,5 +1009,18 @@ end)
 local expandSignal = Instance.new("BindableEvent")
 expandSignal.Name = "ExpandBaseSignal"
 expandSignal.Parent = game.ServerStorage
+
+------------------------------------------------------------------------
+-- Replicated Power State (for home waypoint visibility)
+------------------------------------------------------------------------
+local PowerOnValue = Instance.new("BoolValue")
+PowerOnValue.Name = "GeneratorPowered"
+PowerOnValue.Value = GameState.generator.isPowered
+PowerOnValue.Parent = ReplicatedStorage
+
+-- Keep it in sync whenever power changes
+SyncPowerValue = function()
+	PowerOnValue.Value = GameState.generator.isPowered
+end
 
 print("[GameManager] Initialized - The Purge: Suburban Survival")

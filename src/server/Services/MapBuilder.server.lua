@@ -936,15 +936,26 @@ local function CreateHouseLot(baseCFrame: CFrame, zone: number, houseIndex: numb
 			Parent = houseFolder,
 		})
 
-		-- Spawn point
-		CreatePart({
-			Name = "StarterHouseSpawn",
-			Size = Vector3.new(4, 1, 4),
-			CFrame = houseCF * CFrame.new(0, 1, 0),
-			Transparency = 1,
-			CanCollide = false,
-			Parent = workspace,
-		})
+		-- Spawn point (SpawnLocation so players spawn inside their home)
+		local spawnLoc = Instance.new("SpawnLocation")
+		spawnLoc.Name = "StarterHouseSpawn"
+		spawnLoc.Size = Vector3.new(6, 1, 6)
+		spawnLoc.CFrame = houseCF * CFrame.new(0, 0.6, 0)
+		spawnLoc.Anchored = true
+		spawnLoc.Transparency = 1
+		spawnLoc.CanCollide = false
+		spawnLoc.Enabled = true
+		spawnLoc.Parent = workspace
+
+		-- Store the house position for waypoint use (accessible by clients)
+		local homeMarker = Instance.new("ObjectValue")
+		homeMarker.Name = "HomeBasePosition"
+		homeMarker.Parent = ReplicatedStorage
+		-- Use a CFrame value to store exact house center
+		local homeCFValue = Instance.new("CFrameValue")
+		homeCFValue.Name = "HomeBaseCFrame"
+		homeCFValue.Value = houseCF
+		homeCFValue.Parent = ReplicatedStorage
 	end
 
 	return houseFolder, houseCF
