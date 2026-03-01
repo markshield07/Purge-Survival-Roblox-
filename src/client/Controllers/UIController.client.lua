@@ -31,6 +31,8 @@ local DayChanged = Remotes:WaitForChild("DayChanged")
 local NotifyPlayers = Remotes:WaitForChild("NotifyPlayers")
 local PowerOutAlert = Remotes:WaitForChild("PowerOutAlert")
 local EquipItem = Remotes:WaitForChild("EquipItem")
+local UseItemRemote = Remotes:WaitForChild("UseItem")
+local DropItemRemote = Remotes:WaitForChild("DropItem")
 
 ------------------------------------------------------------------------
 -- Create Main HUD ScreenGui
@@ -181,13 +183,21 @@ local StaminaContainer, StaminaFill, StaminaLabel = CreateBar({
 ------------------------------------------------------------------------
 -- Equipped Weapon Display (below stamina bar)
 ------------------------------------------------------------------------
-local WeaponFrame = CreateFrame({
-	Name = "EquippedWeapon",
-	Size = UDim2.new(0, 220, 0, 36),
-	Position = UDim2.new(0, 15, 0, 140),
-	BackgroundTransparency = 0.4,
-	Corner = 6,
-})
+local WeaponFrame = Instance.new("TextButton")
+WeaponFrame.Name = "EquippedWeapon"
+WeaponFrame.Size = UDim2.new(0, 220, 0, 36)
+WeaponFrame.Position = UDim2.new(0, 15, 0, 140)
+WeaponFrame.AnchorPoint = Vector2.new(0, 0)
+WeaponFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+WeaponFrame.BackgroundTransparency = 0.4
+WeaponFrame.BorderSizePixel = 0
+WeaponFrame.Text = ""
+WeaponFrame.AutoButtonColor = false
+WeaponFrame.Parent = HUD
+
+local weaponFrameCorner = Instance.new("UICorner")
+weaponFrameCorner.CornerRadius = UDim.new(0, 6)
+weaponFrameCorner.Parent = WeaponFrame
 
 local WeaponIcon = CreateLabel({
 	Name = "Icon",
@@ -251,6 +261,14 @@ end
 
 -- Show default equipped weapon
 UpdateEquippedWeaponDisplay("baseball_bat")
+
+-- Click weapon to unequip (put back in backpack)
+local currentEquippedId = "baseball_bat"
+WeaponFrame.MouseButton1Click:Connect(function()
+	if currentEquippedId then
+		EquipItem:FireServer(0)  -- 0 = unequip
+	end
+end)
 
 ------------------------------------------------------------------------
 -- Power Meter (bottom-right)
@@ -377,9 +395,11 @@ local function ShowNotification(text: string, color: Color3?)
 end
 
 ------------------------------------------------------------------------
--- Inventory Display (bottom-center) — Dynamic slots based on maxSlots
+-- Inventory Display (bottom-center) — Clickable slots with actions
 ------------------------------------------------------------------------
 local currentMaxSlots = Config.Player.MaxInventorySlots  -- starts at 5
+local currentInventory = {}  -- cached copy from server
+local selectedSlot = nil     -- currently highlighted slot index
 
 local InventoryFrame = CreateFrame({
 	Name = "InventoryBar",
@@ -418,16 +438,194 @@ InventoryLayout.Parent = InventorySlotContainer
 
 local InventorySlots = {}
 
+------------------------------------------------------------------------
+-- Action Panel (appears above selected slot)
+------------------------------------------------------------------------
+local ActionPanel = CreateFrame({
+	Name = "ActionPanel",
+	Size = UDim2.new(0, 180, 0, 36),
+	Position = UDim2.new(0.5, 0, 1, -95),
+	AnchorPoint = Vector2.new(0.5, 1),
+	BackgroundColor3 = Color3.fromRGB(25, 25, 30),
+	BackgroundTransparency = 0.15,
+	Corner = 8,
+})
+ActionPanel.Visible = false
+
+local ActionLayout = Instance.new("UIListLayout")
+ActionLayout.FillDirection = Enum.FillDirection.Horizontal
+ActionLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ActionLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+ActionLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+ActionLayout.Padding = UDim.new(0, 4)
+ActionLayout.Parent = ActionPanel
+
+-- Item name label above action buttons
+local ActionItemLabel = CreateLabel({
+	Name = "ItemName",
+	Size = UDim2.new(1, 0, 0, 16),
+	Position = UDim2.new(0, 0, 0, -18),
+	Text = "",
+	TextColor3 = Color3.fromRGB(255, 255, 255),
+	Font = Enum.Font.GothamBold,
+	Parent = ActionPanel,
+})
+
+local function CreateActionButton(name, text, color)
+	local btn = Instance.new("TextButton")
+	btn.Name = name
+	btn.Size = UDim2.new(0, 52, 0, 26)
+	btn.BackgroundColor3 = color
+	btn.BackgroundTransparency = 0.2
+	btn.Text = text
+	btn.TextColor3 = Color3.new(1, 1, 1)
+	btn.TextScaled = true
+	btn.Font = Enum.Font.GothamBold
+	btn.BorderSizePixel = 0
+	btn.AutoButtonColor = true
+	btn.Visible = false
+	btn.Parent = ActionPanel
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 6)
+	corner.Parent = btn
+
+	return btn
+end
+
+local EatButton = CreateActionButton("EatBtn", "Eat", Color3.fromRGB(60, 160, 60))
+local EquipButton = CreateActionButton("EquipBtn", "Equip", Color3.fromRGB(50, 120, 200))
+local UseButton = CreateActionButton("UseBtn", "Use", Color3.fromRGB(140, 100, 200))
+local DropButton = CreateActionButton("DropBtn", "Drop", Color3.fromRGB(180, 60, 60))
+
+------------------------------------------------------------------------
+-- Slot selection / deselection
+------------------------------------------------------------------------
+local function DeselectSlot()
+	if selectedSlot and InventorySlots[selectedSlot] then
+		local slotData = InventorySlots[selectedSlot]
+		slotData.stroke.Color = Color3.fromRGB(60, 60, 60)
+		slotData.stroke.Transparency = 0.6
+	end
+	selectedSlot = nil
+	ActionPanel.Visible = false
+	EatButton.Visible = false
+	EquipButton.Visible = false
+	UseButton.Visible = false
+	DropButton.Visible = false
+end
+
+local function SelectSlot(index)
+	-- If clicking same slot, deselect
+	if selectedSlot == index then
+		DeselectSlot()
+		return
+	end
+
+	-- Deselect previous
+	DeselectSlot()
+
+	local item = currentInventory[index]
+	if not item then return end
+
+	local itemData = ItemDatabase.GetItem(item.itemId)
+	if not itemData then return end
+
+	selectedSlot = index
+
+	-- Highlight selected slot
+	local slotData = InventorySlots[index]
+	if slotData then
+		slotData.stroke.Color = Color3.fromRGB(255, 220, 80)
+		slotData.stroke.Transparency = 0
+	end
+
+	-- Show item name
+	local tierColor = Enums.TierColor[itemData.tier] or Color3.new(1, 1, 1)
+	ActionItemLabel.Text = itemData.name
+	ActionItemLabel.TextColor3 = tierColor
+
+	-- Show relevant action buttons based on item category
+	local category = itemData.category
+
+	if category == Enums.ItemCategory.Food and itemData.hungerRestore and itemData.hungerRestore > 0 then
+		EatButton.Visible = true
+	end
+
+	if category == Enums.ItemCategory.Weapon then
+		EquipButton.Visible = true
+	end
+
+	-- "Use" for recipes, energy drinks, etc (non-food, non-weapon usable items)
+	if category == Enums.ItemCategory.Recipe
+		or item.itemId == "energy_drink" then
+		UseButton.Visible = true
+	end
+
+	-- Drop is always available
+	DropButton.Visible = true
+
+	-- Position action panel above the selected slot
+	ActionPanel.Visible = true
+end
+
+------------------------------------------------------------------------
+-- Action button handlers
+------------------------------------------------------------------------
+EatButton.MouseButton1Click:Connect(function()
+	if not selectedSlot then return end
+	local idx = selectedSlot
+	DeselectSlot()
+	UseItemRemote:FireServer(idx)
+end)
+
+EquipButton.MouseButton1Click:Connect(function()
+	if not selectedSlot then return end
+	local idx = selectedSlot
+	DeselectSlot()
+	EquipItem:FireServer(idx)
+end)
+
+UseButton.MouseButton1Click:Connect(function()
+	if not selectedSlot then return end
+	local idx = selectedSlot
+	DeselectSlot()
+	UseItemRemote:FireServer(idx)
+end)
+
+DropButton.MouseButton1Click:Connect(function()
+	if not selectedSlot then return end
+	local idx = selectedSlot
+	DeselectSlot()
+	DropItemRemote:FireServer(idx)
+end)
+
+------------------------------------------------------------------------
+-- Create inventory slots (clickable TextButtons)
+------------------------------------------------------------------------
 local function CreateInventorySlot(index)
 	local slotWidth = math.min(50, math.floor(580 / currentMaxSlots) - 4)
-	local slot = CreateFrame({
-		Name = "Slot_" .. index,
-		Size = UDim2.new(0, slotWidth, 0, 50),
-		BackgroundColor3 = Color3.fromRGB(40, 40, 40),
-		BackgroundTransparency = 0.3,
-		Parent = InventorySlotContainer,
-		Corner = 4,
-	})
+
+	local slot = Instance.new("TextButton")
+	slot.Name = "Slot_" .. index
+	slot.Size = UDim2.new(0, slotWidth, 0, 50)
+	slot.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	slot.BackgroundTransparency = 0.3
+	slot.Text = ""
+	slot.AutoButtonColor = false
+	slot.BorderSizePixel = 0
+	slot.Parent = InventorySlotContainer
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 4)
+	corner.Parent = slot
+
+	-- Selection border stroke
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(60, 60, 60)
+	stroke.Thickness = 2
+	stroke.Transparency = 0.6
+	stroke.Parent = slot
 
 	local nameLabel = CreateLabel({
 		Name = "ItemName",
@@ -449,14 +647,21 @@ local function CreateInventorySlot(index)
 		Parent = slot,
 	})
 
+	-- Click handler
+	slot.MouseButton1Click:Connect(function()
+		SelectSlot(index)
+	end)
+
 	return {
 		frame = slot,
 		nameLabel = nameLabel,
 		countLabel = countLabel,
+		stroke = stroke,
 	}
 end
 
 local function RebuildInventorySlots(maxSlots)
+	DeselectSlot()
 	-- Clear existing slots
 	for _, slotData in ipairs(InventorySlots) do
 		slotData.frame:Destroy()
@@ -476,7 +681,8 @@ end
 RebuildInventorySlots(currentMaxSlots)
 
 local function UpdateInventoryDisplay(inventory)
-	local filledCount = inventory and #inventory or 0
+	currentInventory = inventory or {}
+	local filledCount = #currentInventory
 	BackpackLabel.Text = "Backpack [" .. filledCount .. "/" .. currentMaxSlots .. "]"
 
 	-- Color the label based on capacity
@@ -489,7 +695,7 @@ local function UpdateInventoryDisplay(inventory)
 	end
 
 	for i, slot in ipairs(InventorySlots) do
-		local item = inventory and inventory[i] or nil
+		local item = currentInventory[i]
 		if item then
 			local itemData = ItemDatabase.GetItem(item.itemId)
 			local charLimit = currentMaxSlots > 10 and 5 or 6
@@ -504,6 +710,11 @@ local function UpdateInventoryDisplay(inventory)
 			slot.countLabel.Text = ""
 			slot.frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 		end
+	end
+
+	-- If selected slot is now empty, deselect
+	if selectedSlot and not currentInventory[selectedSlot] then
+		DeselectSlot()
 	end
 end
 
@@ -621,6 +832,7 @@ UpdateHUD.OnClientEvent:Connect(function(updateType, data)
 		UpdateInventoryDisplay(data)
 
 	elseif updateType == "EquippedWeapon" then
+		currentEquippedId = data
 		UpdateEquippedWeaponDisplay(data)
 
 	elseif updateType == "BackpackUpgrade" then
@@ -763,6 +975,29 @@ end)
 -- Purge siren
 PurgeSiren.OnClientEvent:Connect(function()
 	ShowNotification("EMERGENCY BROADCAST: PURGE IS IMMINENT", Color3.fromRGB(255, 0, 0))
+end)
+
+------------------------------------------------------------------------
+-- Request initial state from server on join
+------------------------------------------------------------------------
+local RequestInventory = Remotes:WaitForChild("RequestInventory")
+task.defer(function()
+	local data = RequestInventory:InvokeServer()
+	if data and type(data) == "table" then
+		if data.inventory then
+			UpdateInventoryDisplay(data.inventory)
+		end
+		if data.maxSlots and data.maxSlots ~= currentMaxSlots then
+			RebuildInventorySlots(data.maxSlots)
+			if data.inventory then
+				UpdateInventoryDisplay(data.inventory)
+			end
+		end
+		if data.equippedWeapon then
+			currentEquippedId = data.equippedWeapon
+			UpdateEquippedWeaponDisplay(data.equippedWeapon)
+		end
+	end
 end)
 
 print("[UIController] HUD Initialized")
