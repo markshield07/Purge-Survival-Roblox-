@@ -505,6 +505,21 @@ UpdateHUD.OnClientEvent:Connect(function(updateType, data)
 				data.wave, data.totalWaves, data.enemiesAlive)
 		end
 
+	elseif updateType == "HealthUpdate" then
+		-- Immediate health update from DamagePlayer
+		local healthPct = data.health / Config.Player.MaxHealth
+		HealthFill.Size = UDim2.new(math.max(0, healthPct), 0, 1, 0)
+		HealthLabel.Text = string.format("HP: %d/%d", math.floor(data.health), Config.Player.MaxHealth)
+
+		-- Color the bar based on health
+		if healthPct > 0.5 then
+			HealthFill.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+		elseif healthPct > 0.25 then
+			HealthFill.BackgroundColor3 = Color3.fromRGB(255, 180, 0)
+		else
+			HealthFill.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+		end
+
 	elseif updateType == "DamageTaken" then
 		-- Red flash effect
 		local flashFrame = Instance.new("Frame")

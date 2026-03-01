@@ -2,6 +2,7 @@
 	FortificationService.server.lua
 	Manages house fortification: installing materials, upgrading slots,
 	damage during Purge, and repair.
+	Players can only fortify their own home base (StarterHouse).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -20,7 +21,7 @@ local UpdateHUD = Remotes:WaitForChild("UpdateHUD")
 local NotifyPlayers = Remotes:WaitForChild("NotifyPlayers")
 
 ------------------------------------------------------------------------
--- Helper: Get shared game state
+-- Helpers: read from GameManager (copies, safe for reads only)
 ------------------------------------------------------------------------
 local function GetGameState()
 	local getter = game.ServerStorage:FindFirstChild("GetGameState")
@@ -32,6 +33,48 @@ local function GetPlayerState(player)
 	local getter = game.ServerStorage:FindFirstChild("GetPlayerState")
 	if getter then return getter:Invoke(player) end
 	return nil
+end
+
+------------------------------------------------------------------------
+-- Helpers: mutate authoritative state via GameManager BindableFunctions
+------------------------------------------------------------------------
+local function SetFortSlot(slotName, slotData)
+	local setter = game.ServerStorage:FindFirstChild("SetFortificationSlot")
+	if setter then return setter:Invoke(slotName, slotData) end
+	return false
+end
+
+local function GetFortSlot(slotName)
+	local getter = game.ServerStorage:FindFirstChild("GetFortificationSlot")
+	if getter then return getter:Invoke(slotName) end
+	return nil
+end
+
+local function RemovePlayerItem(player, slotIndex, quantity)
+	local remover = game.ServerStorage:FindFirstChild("RemovePlayerItem")
+	if remover then return remover:Invoke(player, slotIndex, quantity) end
+	return false
+end
+
+------------------------------------------------------------------------
+-- Ownership: Check if a FortSlot belongs to the StarterHouse
+------------------------------------------------------------------------
+local function IsStarterHouseSlot(slotName: string): boolean
+	local slotParts = CollectionService:GetTagged("FortSlot")
+	for _, part in ipairs(slotParts) do
+		if part:GetAttribute("SlotName") == slotName then
+			-- Walk up parents to check if inside StarterHouse folder
+			local parent = part.Parent
+			while parent do
+				if parent.Name == "StarterHouse" then
+					return true
+				end
+				parent = parent.Parent
+			end
+			return false
+		end
+	end
+	return false
 end
 
 ------------------------------------------------------------------------
@@ -55,15 +98,23 @@ end
 
 -- Install material on a fortification slot
 function FortificationService.InstallFortification(player: Player, slotName: string, inventorySlotIndex: number)
-	local gameState = GetGameState()
-	local playerState = GetPlayerState(player)
-	if not gameState or not playerState then return end
+	-- Ownership check: only allow fortifying your own home base
+	if not IsStarterHouseSlot(slotName) then
+		NotifyPlayers:FireClient(player,
+			"You can only fortify your own home base!",
+			Color3.fromRGB(255, 100, 100)
+		)
+		return
+	end
 
-	local slot = gameState.house.fortifications[slotName]
+	local slot = GetFortSlot(slotName)
 	if not slot then
 		NotifyPlayers:FireClient(player, "Invalid fortification slot.", Color3.fromRGB(255, 100, 100))
 		return
 	end
+
+	local playerState = GetPlayerState(player)
+	if not playerState then return end
 
 	local invSlot = playerState.inventory[inventorySlotIndex]
 	if not invSlot then return end
@@ -91,22 +142,18 @@ function FortificationService.InstallFortification(player: Player, slotName: str
 		end
 	end
 
-	-- Install the material
+	-- Install the material (mutate authoritative state)
 	local durability = FortificationService.GetDurability(invSlot.itemId)
 	slot.materialId = invSlot.itemId
 	slot.durability = durability
 	slot.maxDurability = durability
+	SetFortSlot(slotName, slot)
 
-	-- Remove from inventory
-	invSlot.quantity -= 1
-	if invSlot.quantity <= 0 then
-		table.remove(playerState.inventory, inventorySlotIndex)
-	end
+	-- Remove item from authoritative inventory
+	RemovePlayerItem(player, inventorySlotIndex, 1)
 
-	-- Update the physical fortification in workspace
+	-- Update visuals
 	FortificationService.UpdateSlotVisual(slotName, slot)
-
-	UpdateHUD:FireClient(player, "InventoryUpdate", playerState.inventory)
 	UpdateHUD:FireAllClients("FortificationUpdate", { slotName = slotName, data = slot })
 	NotifyPlayers:FireClient(player,
 		"Installed " .. itemData.name .. " on " .. slotName .. " (HP: " .. durability .. ")",
@@ -116,9 +163,20 @@ end
 
 -- Install a trap
 function FortificationService.InstallTrap(player: Player, slotName: string, inventorySlotIndex: number)
+	-- Ownership check
+	if not IsStarterHouseSlot(slotName) then
+		NotifyPlayers:FireClient(player,
+			"You can only place traps in your own home base!",
+			Color3.fromRGB(255, 100, 100)
+		)
+		return
+	end
+
 	local gameState = GetGameState()
+	if not gameState then return end
+
 	local playerState = GetPlayerState(player)
-	if not gameState or not playerState then return end
+	if not playerState then return end
 
 	local invSlot = playerState.inventory[inventorySlotIndex]
 	if not invSlot then return end
@@ -135,33 +193,21 @@ function FortificationService.InstallTrap(player: Player, slotName: string, inve
 		return
 	end
 
-	-- Install trap at slot
-	local slot = gameState.house.fortifications[slotName]
-	if not slot then
-		-- Create new trap slot
-		gameState.house.fortifications[slotName] = {
-			slotType = Enums.FortSlot.HallwayTrap,
-			materialId = invSlot.itemId,
-			durability = 1,  -- traps are single-use or active
-			maxDurability = 1,
-			isTrap = true,
-			trapDamage = itemData.damage or 0,
-			requiresPower = itemData.requiresPower or false,
-		}
-	else
-		slot.materialId = invSlot.itemId
-		slot.isTrap = true
-		slot.trapDamage = itemData.damage or 0
-		slot.requiresPower = itemData.requiresPower or false
-	end
+	-- Build trap slot data and persist via authoritative mutation
+	local existingSlot = GetFortSlot(slotName)
+	local trapSlot = existingSlot or {}
+	trapSlot.slotType = Enums.FortSlot.HallwayTrap
+	trapSlot.materialId = invSlot.itemId
+	trapSlot.durability = 1
+	trapSlot.maxDurability = 1
+	trapSlot.isTrap = true
+	trapSlot.trapDamage = itemData.damage or 0
+	trapSlot.requiresPower = itemData.requiresPower or false
+	SetFortSlot(slotName, trapSlot)
 
-	-- Remove from inventory
-	invSlot.quantity -= 1
-	if invSlot.quantity <= 0 then
-		table.remove(playerState.inventory, inventorySlotIndex)
-	end
+	-- Remove item from authoritative inventory
+	RemovePlayerItem(player, inventorySlotIndex, 1)
 
-	UpdateHUD:FireClient(player, "InventoryUpdate", playerState.inventory)
 	NotifyPlayers:FireClient(player,
 		"Installed " .. itemData.name .. " at " .. slotName,
 		Color3.fromRGB(100, 255, 100)
@@ -170,15 +216,12 @@ end
 
 -- Damage a fortification slot (called by Purge enemies)
 function FortificationService.DamageSlot(slotName: string, damage: number): boolean
-	local gameState = GetGameState()
-	if not gameState then return true end  -- broken through
-
-	local slot = gameState.house.fortifications[slotName]
+	local slot = GetFortSlot(slotName)
 	if not slot or not slot.materialId then
 		return true  -- no fortification = breached
 	end
 
-	slot.durability -= damage
+	slot.durability = slot.durability - damage
 	UpdateHUD:FireAllClients("FortificationUpdate", { slotName = slotName, data = slot })
 
 	if slot.durability <= 0 then
@@ -193,19 +236,26 @@ function FortificationService.DamageSlot(slotName: string, damage: number): bool
 		)
 
 		FortificationService.UpdateSlotVisual(slotName, slot)
+		SetFortSlot(slotName, slot)
 		return true  -- enemies can pass through
 	end
 
+	SetFortSlot(slotName, slot)
 	return false  -- still holding
 end
 
 -- Repair a fortification slot
 function FortificationService.RepairSlot(player: Player, slotName: string)
-	local gameState = GetGameState()
-	local playerState = GetPlayerState(player)
-	if not gameState or not playerState then return end
+	-- Ownership check
+	if not IsStarterHouseSlot(slotName) then
+		NotifyPlayers:FireClient(player,
+			"You can only repair your own home base!",
+			Color3.fromRGB(255, 100, 100)
+		)
+		return
+	end
 
-	local slot = gameState.house.fortifications[slotName]
+	local slot = GetFortSlot(slotName)
 	if not slot or not slot.materialId then
 		NotifyPlayers:FireClient(player, "Nothing to repair here.", Color3.fromRGB(255, 200, 100))
 		return
@@ -216,34 +266,32 @@ function FortificationService.RepairSlot(player: Player, slotName: string)
 		return
 	end
 
-	-- Require duct tape or nails for repair
-	local repairItem = nil
+	-- Find repair material in player's inventory (read copy is fine for search)
+	local playerState = GetPlayerState(player)
+	if not playerState then return end
+
 	local repairSlotIdx = nil
 	for i, invSlot in ipairs(playerState.inventory) do
 		if invSlot.itemId == "duct_tape" or invSlot.itemId == "nails" then
-			repairItem = invSlot
 			repairSlotIdx = i
 			break
 		end
 	end
 
-	if not repairItem then
+	if not repairSlotIdx then
 		NotifyPlayers:FireClient(player, "Need duct tape or nails to repair.", Color3.fromRGB(255, 200, 100))
 		return
 	end
 
-	-- Restore 25% durability
+	-- Restore 25% durability (mutate authoritative state)
 	local repairAmount = math.ceil(slot.maxDurability * 0.25)
 	slot.durability = math.min(slot.maxDurability, slot.durability + repairAmount)
+	SetFortSlot(slotName, slot)
 
-	-- Consume repair material
-	repairItem.quantity -= 1
-	if repairItem.quantity <= 0 then
-		table.remove(playerState.inventory, repairSlotIdx)
-	end
+	-- Consume repair material from authoritative inventory
+	RemovePlayerItem(player, repairSlotIdx, 1)
 
 	FortificationService.UpdateSlotVisual(slotName, slot)
-	UpdateHUD:FireClient(player, "InventoryUpdate", playerState.inventory)
 	UpdateHUD:FireAllClients("FortificationUpdate", { slotName = slotName, data = slot })
 	NotifyPlayers:FireClient(player,
 		"Repaired " .. slotName .. " (+" .. repairAmount .. " HP)",
@@ -253,7 +301,6 @@ end
 
 -- Update visual representation of a fortification slot
 function FortificationService.UpdateSlotVisual(slotName: string, slotData)
-	-- Find the physical slot in the workspace
 	local slotParts = CollectionService:GetTagged("FortSlot")
 	for _, part in ipairs(slotParts) do
 		if part:GetAttribute("SlotName") == slotName then

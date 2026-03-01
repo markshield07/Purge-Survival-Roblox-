@@ -2195,6 +2195,14 @@ local function InitPlayerState(player: Player)
 		purgeCoins = 0,
 	}
 
+	-- Starter weapon: Baseball Bat so players can defend themselves
+	table.insert(PlayerStates[player].inventory, {
+		itemId = "baseball_bat",
+		quantity = 1,
+		spoilDay = -1,
+		pickedUpDay = 0,
+	})
+
 	-- Add starter recipes
 	local RecipeDB = require(Modules.RecipeDatabase)
 	for _, recipeId in ipairs(RecipeDB.GetStarterRecipes()) do
@@ -2806,6 +2814,96 @@ GetPlayerState.Name = "GetPlayerState"
 GetPlayerState.Parent = game.ServerStorage
 GetPlayerState.OnInvoke = function(player)
 	return PlayerStates[player]
+end
+
+------------------------------------------------------------------------
+-- Mutation BindableFunctions
+-- BindableFunctions copy tables across script boundaries, so other
+-- scripts cannot mutate PlayerStates/GameState directly. These
+-- functions run inside GameManager's scope with direct access.
+------------------------------------------------------------------------
+
+-- DamagePlayer: apply damage to the authoritative player state
+-- Returns: { newHealth: number, isDowned: boolean }
+local DamagePlayerBF = Instance.new("BindableFunction")
+DamagePlayerBF.Name = "DamagePlayer"
+DamagePlayerBF.Parent = game.ServerStorage
+DamagePlayerBF.OnInvoke = function(player, damage)
+	local state = PlayerStates[player]
+	if not state or state.state ~= Enums.PlayerState.Alive then
+		return { newHealth = 0, isDowned = false }
+	end
+
+	state.health = state.health - damage
+
+	-- Sync with Humanoid so other systems see accurate health
+	local char = player.Character
+	if char then
+		local hum = char:FindFirstChildOfClass("Humanoid")
+		if hum then
+			hum.Health = math.max(0, state.health)
+		end
+	end
+
+	local isDowned = false
+	if state.health &lt;= 0 then
+		state.health = 0
+		state.state = Enums.PlayerState.Downed
+		state.downedAt = tick()
+		isDowned = true
+
+		local PlayerDownedRemote = Remotes:FindFirstChild("PlayerDowned")
+		if PlayerDownedRemote then
+			PlayerDownedRemote:FireAllClients(player)
+		end
+	end
+
+	-- Send immediate health update to client
+	UpdateHUD:FireClient(player, "HealthUpdate", {
+		health = state.health,
+		damage = damage,
+	})
+
+	return { newHealth = state.health, isDowned = isDowned }
+end
+
+-- SetFortificationSlot: modify fortification state in the authoritative GameState
+local SetFortSlotBF = Instance.new("BindableFunction")
+SetFortSlotBF.Name = "SetFortificationSlot"
+SetFortSlotBF.Parent = game.ServerStorage
+SetFortSlotBF.OnInvoke = function(slotName, slotData)
+	if not GameState.house or not GameState.house.fortifications then return false end
+	GameState.house.fortifications[slotName] = slotData
+	return true
+end
+
+-- RemovePlayerItem: remove an item from the authoritative player inventory
+-- Returns: true if successful
+local RemoveItemBF = Instance.new("BindableFunction")
+RemoveItemBF.Name = "RemovePlayerItem"
+RemoveItemBF.Parent = game.ServerStorage
+RemoveItemBF.OnInvoke = function(player, slotIndex, quantity)
+	local state = PlayerStates[player]
+	if not state or not state.inventory[slotIndex] then return false end
+
+	local slot = state.inventory[slotIndex]
+	slot.quantity = slot.quantity - (quantity or 1)
+	if slot.quantity &lt;= 0 then
+		table.remove(state.inventory, slotIndex)
+	end
+
+	-- Send updated inventory to client
+	UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
+	return true
+end
+
+-- GetFortificationSlot: read a single fortification slot from authoritative state
+local GetFortSlotBF = Instance.new("BindableFunction")
+GetFortSlotBF.Name = "GetFortificationSlot"
+GetFortSlotBF.Parent = game.ServerStorage
+GetFortSlotBF.OnInvoke = function(slotName)
+	if not GameState.house or not GameState.house.fortifications then return nil end
+	return GameState.house.fortifications[slotName]
 end
 
 print("[GameManager] Initialized - The Purge: Suburban Survival")
@@ -3497,6 +3595,7 @@ print("[LootService] Initialized")
 	FortificationService.server.lua
 	Manages house fortification: installing materials, upgrading slots,
 	damage during Purge, and repair.
+	Players can only fortify their own home base (StarterHouse).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -3515,7 +3614,7 @@ local UpdateHUD = Remotes:WaitForChild("UpdateHUD")
 local NotifyPlayers = Remotes:WaitForChild("NotifyPlayers")
 
 ------------------------------------------------------------------------
--- Helper: Get shared game state
+-- Helpers: read from GameManager (copies, safe for reads only)
 ------------------------------------------------------------------------
 local function GetGameState()
 	local getter = game.ServerStorage:FindFirstChild("GetGameState")
@@ -3527,6 +3626,48 @@ local function GetPlayerState(player)
 	local getter = game.ServerStorage:FindFirstChild("GetPlayerState")
 	if getter then return getter:Invoke(player) end
 	return nil
+end
+
+------------------------------------------------------------------------
+-- Helpers: mutate authoritative state via GameManager BindableFunctions
+------------------------------------------------------------------------
+local function SetFortSlot(slotName, slotData)
+	local setter = game.ServerStorage:FindFirstChild("SetFortificationSlot")
+	if setter then return setter:Invoke(slotName, slotData) end
+	return false
+end
+
+local function GetFortSlot(slotName)
+	local getter = game.ServerStorage:FindFirstChild("GetFortificationSlot")
+	if getter then return getter:Invoke(slotName) end
+	return nil
+end
+
+local function RemovePlayerItem(player, slotIndex, quantity)
+	local remover = game.ServerStorage:FindFirstChild("RemovePlayerItem")
+	if remover then return remover:Invoke(player, slotIndex, quantity) end
+	return false
+end
+
+------------------------------------------------------------------------
+-- Ownership: Check if a FortSlot belongs to the StarterHouse
+------------------------------------------------------------------------
+local function IsStarterHouseSlot(slotName: string): boolean
+	local slotParts = CollectionService:GetTagged("FortSlot")
+	for _, part in ipairs(slotParts) do
+		if part:GetAttribute("SlotName") == slotName then
+			-- Walk up parents to check if inside StarterHouse folder
+			local parent = part.Parent
+			while parent do
+				if parent.Name == "StarterHouse" then
+					return true
+				end
+				parent = parent.Parent
+			end
+			return false
+		end
+	end
+	return false
 end
 
 ------------------------------------------------------------------------
@@ -3550,15 +3691,23 @@ end
 
 -- Install material on a fortification slot
 function FortificationService.InstallFortification(player: Player, slotName: string, inventorySlotIndex: number)
-	local gameState = GetGameState()
-	local playerState = GetPlayerState(player)
-	if not gameState or not playerState then return end
+	-- Ownership check: only allow fortifying your own home base
+	if not IsStarterHouseSlot(slotName) then
+		NotifyPlayers:FireClient(player,
+			"You can only fortify your own home base!",
+			Color3.fromRGB(255, 100, 100)
+		)
+		return
+	end
 
-	local slot = gameState.house.fortifications[slotName]
+	local slot = GetFortSlot(slotName)
 	if not slot then
 		NotifyPlayers:FireClient(player, "Invalid fortification slot.", Color3.fromRGB(255, 100, 100))
 		return
 	end
+
+	local playerState = GetPlayerState(player)
+	if not playerState then return end
 
 	local invSlot = playerState.inventory[inventorySlotIndex]
 	if not invSlot then return end
@@ -3586,22 +3735,18 @@ function FortificationService.InstallFortification(player: Player, slotName: str
 		end
 	end
 
-	-- Install the material
+	-- Install the material (mutate authoritative state)
 	local durability = FortificationService.GetDurability(invSlot.itemId)
 	slot.materialId = invSlot.itemId
 	slot.durability = durability
 	slot.maxDurability = durability
+	SetFortSlot(slotName, slot)
 
-	-- Remove from inventory
-	invSlot.quantity -= 1
-	if invSlot.quantity &lt;= 0 then
-		table.remove(playerState.inventory, inventorySlotIndex)
-	end
+	-- Remove item from authoritative inventory
+	RemovePlayerItem(player, inventorySlotIndex, 1)
 
-	-- Update the physical fortification in workspace
+	-- Update visuals
 	FortificationService.UpdateSlotVisual(slotName, slot)
-
-	UpdateHUD:FireClient(player, "InventoryUpdate", playerState.inventory)
 	UpdateHUD:FireAllClients("FortificationUpdate", { slotName = slotName, data = slot })
 	NotifyPlayers:FireClient(player,
 		"Installed " .. itemData.name .. " on " .. slotName .. " (HP: " .. durability .. ")",
@@ -3611,9 +3756,20 @@ end
 
 -- Install a trap
 function FortificationService.InstallTrap(player: Player, slotName: string, inventorySlotIndex: number)
+	-- Ownership check
+	if not IsStarterHouseSlot(slotName) then
+		NotifyPlayers:FireClient(player,
+			"You can only place traps in your own home base!",
+			Color3.fromRGB(255, 100, 100)
+		)
+		return
+	end
+
 	local gameState = GetGameState()
+	if not gameState then return end
+
 	local playerState = GetPlayerState(player)
-	if not gameState or not playerState then return end
+	if not playerState then return end
 
 	local invSlot = playerState.inventory[inventorySlotIndex]
 	if not invSlot then return end
@@ -3630,33 +3786,21 @@ function FortificationService.InstallTrap(player: Player, slotName: string, inve
 		return
 	end
 
-	-- Install trap at slot
-	local slot = gameState.house.fortifications[slotName]
-	if not slot then
-		-- Create new trap slot
-		gameState.house.fortifications[slotName] = {
-			slotType = Enums.FortSlot.HallwayTrap,
-			materialId = invSlot.itemId,
-			durability = 1,  -- traps are single-use or active
-			maxDurability = 1,
-			isTrap = true,
-			trapDamage = itemData.damage or 0,
-			requiresPower = itemData.requiresPower or false,
-		}
-	else
-		slot.materialId = invSlot.itemId
-		slot.isTrap = true
-		slot.trapDamage = itemData.damage or 0
-		slot.requiresPower = itemData.requiresPower or false
-	end
+	-- Build trap slot data and persist via authoritative mutation
+	local existingSlot = GetFortSlot(slotName)
+	local trapSlot = existingSlot or {}
+	trapSlot.slotType = Enums.FortSlot.HallwayTrap
+	trapSlot.materialId = invSlot.itemId
+	trapSlot.durability = 1
+	trapSlot.maxDurability = 1
+	trapSlot.isTrap = true
+	trapSlot.trapDamage = itemData.damage or 0
+	trapSlot.requiresPower = itemData.requiresPower or false
+	SetFortSlot(slotName, trapSlot)
 
-	-- Remove from inventory
-	invSlot.quantity -= 1
-	if invSlot.quantity &lt;= 0 then
-		table.remove(playerState.inventory, inventorySlotIndex)
-	end
+	-- Remove item from authoritative inventory
+	RemovePlayerItem(player, inventorySlotIndex, 1)
 
-	UpdateHUD:FireClient(player, "InventoryUpdate", playerState.inventory)
 	NotifyPlayers:FireClient(player,
 		"Installed " .. itemData.name .. " at " .. slotName,
 		Color3.fromRGB(100, 255, 100)
@@ -3665,15 +3809,12 @@ end
 
 -- Damage a fortification slot (called by Purge enemies)
 function FortificationService.DamageSlot(slotName: string, damage: number): boolean
-	local gameState = GetGameState()
-	if not gameState then return true end  -- broken through
-
-	local slot = gameState.house.fortifications[slotName]
+	local slot = GetFortSlot(slotName)
 	if not slot or not slot.materialId then
 		return true  -- no fortification = breached
 	end
 
-	slot.durability -= damage
+	slot.durability = slot.durability - damage
 	UpdateHUD:FireAllClients("FortificationUpdate", { slotName = slotName, data = slot })
 
 	if slot.durability &lt;= 0 then
@@ -3688,19 +3829,26 @@ function FortificationService.DamageSlot(slotName: string, damage: number): bool
 		)
 
 		FortificationService.UpdateSlotVisual(slotName, slot)
+		SetFortSlot(slotName, slot)
 		return true  -- enemies can pass through
 	end
 
+	SetFortSlot(slotName, slot)
 	return false  -- still holding
 end
 
 -- Repair a fortification slot
 function FortificationService.RepairSlot(player: Player, slotName: string)
-	local gameState = GetGameState()
-	local playerState = GetPlayerState(player)
-	if not gameState or not playerState then return end
+	-- Ownership check
+	if not IsStarterHouseSlot(slotName) then
+		NotifyPlayers:FireClient(player,
+			"You can only repair your own home base!",
+			Color3.fromRGB(255, 100, 100)
+		)
+		return
+	end
 
-	local slot = gameState.house.fortifications[slotName]
+	local slot = GetFortSlot(slotName)
 	if not slot or not slot.materialId then
 		NotifyPlayers:FireClient(player, "Nothing to repair here.", Color3.fromRGB(255, 200, 100))
 		return
@@ -3711,34 +3859,32 @@ function FortificationService.RepairSlot(player: Player, slotName: string)
 		return
 	end
 
-	-- Require duct tape or nails for repair
-	local repairItem = nil
+	-- Find repair material in player's inventory (read copy is fine for search)
+	local playerState = GetPlayerState(player)
+	if not playerState then return end
+
 	local repairSlotIdx = nil
 	for i, invSlot in ipairs(playerState.inventory) do
 		if invSlot.itemId == "duct_tape" or invSlot.itemId == "nails" then
-			repairItem = invSlot
 			repairSlotIdx = i
 			break
 		end
 	end
 
-	if not repairItem then
+	if not repairSlotIdx then
 		NotifyPlayers:FireClient(player, "Need duct tape or nails to repair.", Color3.fromRGB(255, 200, 100))
 		return
 	end
 
-	-- Restore 25% durability
+	-- Restore 25% durability (mutate authoritative state)
 	local repairAmount = math.ceil(slot.maxDurability * 0.25)
 	slot.durability = math.min(slot.maxDurability, slot.durability + repairAmount)
+	SetFortSlot(slotName, slot)
 
-	-- Consume repair material
-	repairItem.quantity -= 1
-	if repairItem.quantity &lt;= 0 then
-		table.remove(playerState.inventory, repairSlotIdx)
-	end
+	-- Consume repair material from authoritative inventory
+	RemovePlayerItem(player, repairSlotIdx, 1)
 
 	FortificationService.UpdateSlotVisual(slotName, slot)
-	UpdateHUD:FireClient(player, "InventoryUpdate", playerState.inventory)
 	UpdateHUD:FireAllClients("FortificationUpdate", { slotName = slotName, data = slot })
 	NotifyPlayers:FireClient(player,
 		"Repaired " .. slotName .. " (+" .. repairAmount .. " HP)",
@@ -3748,7 +3894,6 @@ end
 
 -- Update visual representation of a fortification slot
 function FortificationService.UpdateSlotVisual(slotName: string, slotData)
-	-- Find the physical slot in the workspace
 	local slotParts = CollectionService:GetTagged("FortSlot")
 	for _, part in ipairs(slotParts) do
 		if part:GetAttribute("SlotName") == slotName then
@@ -4346,27 +4491,12 @@ local function EnemyAttackLoop(enemyModel: Model, enemyData)
 			end
 			task.wait(1.5)
 		elseif nearestPlayer and playerDist &lt;= attackRange then
-			-- Attack player
-			local playerState = nil
-			local getPS = game.ServerStorage:FindFirstChild("GetPlayerState")
-			if getPS then
-				playerState = getPS:Invoke(nearestPlayer)
+			-- Attack player via GameManager's authoritative DamagePlayer
+			local damageFunc = game.ServerStorage:FindFirstChild("DamagePlayer")
+			if damageFunc then
+				damageFunc:Invoke(nearestPlayer, damage)
 			end
-
-			if playerState and playerState.state == Enums.PlayerState.Alive then
-				playerState.health -= damage
-				UpdateHUD:FireClient(nearestPlayer, "DamageTaken", damage)
-
-				if playerState.health &lt;= 0 then
-					playerState.health = 0
-					playerState.state = Enums.PlayerState.Downed
-					playerState.downedAt = tick()
-					local PlayerDowned = Remotes:FindFirstChild("PlayerDowned")
-					if PlayerDowned then
-						PlayerDowned:FireAllClients(nearestPlayer)
-					end
-				end
-			end
+			UpdateHUD:FireClient(nearestPlayer, "DamageTaken", damage)
 			task.wait(1.0)
 		else
 			-- Move toward target
@@ -5538,25 +5668,12 @@ local function DefenderAITick()
 			if not nearestPlayer or nearestDist &gt; (Config.NPCStats[data.type] and Config.NPCStats[data.type].attackRange or 5) + 5 then
 				data.state = "alert"
 			else
-				-- Deal damage
-				local getPS = game.ServerStorage:FindFirstChild("GetPlayerState")
-				if getPS and nearestPlayer then
-					local playerState = getPS:Invoke(nearestPlayer)
-					if playerState and playerState.state == Enums.PlayerState.Alive then
-						local damage = Config.NPCStats[data.type] and Config.NPCStats[data.type].damage or 10
-						playerState.health -= damage
-						UpdateHUD:FireClient(nearestPlayer, "DamageTaken", damage)
-
-						if playerState.health &lt;= 0 then
-							playerState.health = 0
-							playerState.state = Enums.PlayerState.Downed
-							playerState.downedAt = tick()
-							local PlayerDowned = Remotes:FindFirstChild("PlayerDowned")
-							if PlayerDowned then
-								PlayerDowned:FireAllClients(nearestPlayer)
-							end
-						end
-					end
+				-- Deal damage via GameManager's authoritative DamagePlayer
+				local dmgAmount = Config.NPCStats[data.type] and Config.NPCStats[data.type].damage or 10
+				local damageFunc = game.ServerStorage:FindFirstChild("DamagePlayer")
+				if damageFunc and nearestPlayer then
+					damageFunc:Invoke(nearestPlayer, dmgAmount)
+					UpdateHUD:FireClient(nearestPlayer, "DamageTaken", dmgAmount)
 				end
 			end
 
@@ -8691,6 +8808,21 @@ UpdateHUD.OnClientEvent:Connect(function(updateType, data)
 				data.wave, data.totalWaves, data.enemiesAlive)
 		end
 
+	elseif updateType == "HealthUpdate" then
+		-- Immediate health update from DamagePlayer
+		local healthPct = data.health / Config.Player.MaxHealth
+		HealthFill.Size = UDim2.new(math.max(0, healthPct), 0, 1, 0)
+		HealthLabel.Text = string.format("HP: %d/%d", math.floor(data.health), Config.Player.MaxHealth)
+
+		-- Color the bar based on health
+		if healthPct &gt; 0.5 then
+			HealthFill.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+		elseif healthPct &gt; 0.25 then
+			HealthFill.BackgroundColor3 = Color3.fromRGB(255, 180, 0)
+		else
+			HealthFill.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+		end
+
 	elseif updateType == "DamageTaken" then
 		-- Red flash effect
 		local flashFrame = Instance.new("Frame")
@@ -9429,8 +9561,26 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
 		return
 	end
 
-	-- Fortification Slot
+	-- Fortification Slot (only allow on your own StarterHouse)
 	if CollectionService:HasTag(part, "FortSlot") then
+		-- Check if this slot is inside the StarterHouse
+		local isOwnBase = false
+		local parent = part.Parent
+		while parent do
+			if parent.Name == "StarterHouse" then
+				isOwnBase = true
+				break
+			end
+			parent = parent.Parent
+		end
+
+		if not isOwnBase then
+			-- Notify player they can't fortify other houses
+			local NotifyPlayers = Remotes:FindFirstChild("NotifyPlayers")
+			-- Just show a local message since we can't fire server events to ourselves
+			return
+		end
+
 		local slotName = part:GetAttribute("SlotName")
 		if slotName then
 			OpenFortificationUI(slotName)

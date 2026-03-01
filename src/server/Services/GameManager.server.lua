@@ -119,6 +119,14 @@ local function InitPlayerState(player: Player)
 		purgeCoins = 0,
 	}
 
+	-- Starter weapon: Baseball Bat so players can defend themselves
+	table.insert(PlayerStates[player].inventory, {
+		itemId = "baseball_bat",
+		quantity = 1,
+		spoilDay = -1,
+		pickedUpDay = 0,
+	})
+
 	-- Add starter recipes
 	local RecipeDB = require(Modules.RecipeDatabase)
 	for _, recipeId in ipairs(RecipeDB.GetStarterRecipes()) do
@@ -730,6 +738,96 @@ GetPlayerState.Name = "GetPlayerState"
 GetPlayerState.Parent = game.ServerStorage
 GetPlayerState.OnInvoke = function(player)
 	return PlayerStates[player]
+end
+
+------------------------------------------------------------------------
+-- Mutation BindableFunctions
+-- BindableFunctions copy tables across script boundaries, so other
+-- scripts cannot mutate PlayerStates/GameState directly. These
+-- functions run inside GameManager's scope with direct access.
+------------------------------------------------------------------------
+
+-- DamagePlayer: apply damage to the authoritative player state
+-- Returns: { newHealth: number, isDowned: boolean }
+local DamagePlayerBF = Instance.new("BindableFunction")
+DamagePlayerBF.Name = "DamagePlayer"
+DamagePlayerBF.Parent = game.ServerStorage
+DamagePlayerBF.OnInvoke = function(player, damage)
+	local state = PlayerStates[player]
+	if not state or state.state ~= Enums.PlayerState.Alive then
+		return { newHealth = 0, isDowned = false }
+	end
+
+	state.health = state.health - damage
+
+	-- Sync with Humanoid so other systems see accurate health
+	local char = player.Character
+	if char then
+		local hum = char:FindFirstChildOfClass("Humanoid")
+		if hum then
+			hum.Health = math.max(0, state.health)
+		end
+	end
+
+	local isDowned = false
+	if state.health <= 0 then
+		state.health = 0
+		state.state = Enums.PlayerState.Downed
+		state.downedAt = tick()
+		isDowned = true
+
+		local PlayerDownedRemote = Remotes:FindFirstChild("PlayerDowned")
+		if PlayerDownedRemote then
+			PlayerDownedRemote:FireAllClients(player)
+		end
+	end
+
+	-- Send immediate health update to client
+	UpdateHUD:FireClient(player, "HealthUpdate", {
+		health = state.health,
+		damage = damage,
+	})
+
+	return { newHealth = state.health, isDowned = isDowned }
+end
+
+-- SetFortificationSlot: modify fortification state in the authoritative GameState
+local SetFortSlotBF = Instance.new("BindableFunction")
+SetFortSlotBF.Name = "SetFortificationSlot"
+SetFortSlotBF.Parent = game.ServerStorage
+SetFortSlotBF.OnInvoke = function(slotName, slotData)
+	if not GameState.house or not GameState.house.fortifications then return false end
+	GameState.house.fortifications[slotName] = slotData
+	return true
+end
+
+-- RemovePlayerItem: remove an item from the authoritative player inventory
+-- Returns: true if successful
+local RemoveItemBF = Instance.new("BindableFunction")
+RemoveItemBF.Name = "RemovePlayerItem"
+RemoveItemBF.Parent = game.ServerStorage
+RemoveItemBF.OnInvoke = function(player, slotIndex, quantity)
+	local state = PlayerStates[player]
+	if not state or not state.inventory[slotIndex] then return false end
+
+	local slot = state.inventory[slotIndex]
+	slot.quantity = slot.quantity - (quantity or 1)
+	if slot.quantity <= 0 then
+		table.remove(state.inventory, slotIndex)
+	end
+
+	-- Send updated inventory to client
+	UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
+	return true
+end
+
+-- GetFortificationSlot: read a single fortification slot from authoritative state
+local GetFortSlotBF = Instance.new("BindableFunction")
+GetFortSlotBF.Name = "GetFortificationSlot"
+GetFortSlotBF.Parent = game.ServerStorage
+GetFortSlotBF.OnInvoke = function(slotName)
+	if not GameState.house or not GameState.house.fortifications then return nil end
+	return GameState.house.fortifications[slotName]
 end
 
 print("[GameManager] Initialized - The Purge: Suburban Survival")

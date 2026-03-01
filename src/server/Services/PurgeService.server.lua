@@ -261,27 +261,12 @@ local function EnemyAttackLoop(enemyModel: Model, enemyData)
 			end
 			task.wait(1.5)
 		elseif nearestPlayer and playerDist <= attackRange then
-			-- Attack player
-			local playerState = nil
-			local getPS = game.ServerStorage:FindFirstChild("GetPlayerState")
-			if getPS then
-				playerState = getPS:Invoke(nearestPlayer)
+			-- Attack player via GameManager's authoritative DamagePlayer
+			local damageFunc = game.ServerStorage:FindFirstChild("DamagePlayer")
+			if damageFunc then
+				damageFunc:Invoke(nearestPlayer, damage)
 			end
-
-			if playerState and playerState.state == Enums.PlayerState.Alive then
-				playerState.health -= damage
-				UpdateHUD:FireClient(nearestPlayer, "DamageTaken", damage)
-
-				if playerState.health <= 0 then
-					playerState.health = 0
-					playerState.state = Enums.PlayerState.Downed
-					playerState.downedAt = tick()
-					local PlayerDowned = Remotes:FindFirstChild("PlayerDowned")
-					if PlayerDowned then
-						PlayerDowned:FireAllClients(nearestPlayer)
-					end
-				end
-			end
+			UpdateHUD:FireClient(nearestPlayer, "DamageTaken", damage)
 			task.wait(1.0)
 		else
 			-- Move toward target

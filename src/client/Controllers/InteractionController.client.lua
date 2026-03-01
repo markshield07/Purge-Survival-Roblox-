@@ -60,8 +60,26 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
 		return
 	end
 
-	-- Fortification Slot
+	-- Fortification Slot (only allow on your own StarterHouse)
 	if CollectionService:HasTag(part, "FortSlot") then
+		-- Check if this slot is inside the StarterHouse
+		local isOwnBase = false
+		local parent = part.Parent
+		while parent do
+			if parent.Name == "StarterHouse" then
+				isOwnBase = true
+				break
+			end
+			parent = parent.Parent
+		end
+
+		if not isOwnBase then
+			-- Notify player they can't fortify other houses
+			local NotifyPlayers = Remotes:FindFirstChild("NotifyPlayers")
+			-- Just show a local message since we can't fire server events to ourselves
+			return
+		end
+
 		local slotName = part:GetAttribute("SlotName")
 		if slotName then
 			OpenFortificationUI(slotName)

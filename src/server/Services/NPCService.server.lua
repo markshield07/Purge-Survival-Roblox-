@@ -249,25 +249,12 @@ local function DefenderAITick()
 			if not nearestPlayer or nearestDist > (Config.NPCStats[data.type] and Config.NPCStats[data.type].attackRange or 5) + 5 then
 				data.state = "alert"
 			else
-				-- Deal damage
-				local getPS = game.ServerStorage:FindFirstChild("GetPlayerState")
-				if getPS and nearestPlayer then
-					local playerState = getPS:Invoke(nearestPlayer)
-					if playerState and playerState.state == Enums.PlayerState.Alive then
-						local damage = Config.NPCStats[data.type] and Config.NPCStats[data.type].damage or 10
-						playerState.health -= damage
-						UpdateHUD:FireClient(nearestPlayer, "DamageTaken", damage)
-
-						if playerState.health <= 0 then
-							playerState.health = 0
-							playerState.state = Enums.PlayerState.Downed
-							playerState.downedAt = tick()
-							local PlayerDowned = Remotes:FindFirstChild("PlayerDowned")
-							if PlayerDowned then
-								PlayerDowned:FireAllClients(nearestPlayer)
-							end
-						end
-					end
+				-- Deal damage via GameManager's authoritative DamagePlayer
+				local dmgAmount = Config.NPCStats[data.type] and Config.NPCStats[data.type].damage or 10
+				local damageFunc = game.ServerStorage:FindFirstChild("DamagePlayer")
+				if damageFunc and nearestPlayer then
+					damageFunc:Invoke(nearestPlayer, dmgAmount)
+					UpdateHUD:FireClient(nearestPlayer, "DamageTaken", dmgAmount)
 				end
 			end
 
