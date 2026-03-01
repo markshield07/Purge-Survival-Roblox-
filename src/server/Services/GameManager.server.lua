@@ -828,6 +828,274 @@ RemoveItemBF.OnInvoke = function(player, slotIndex, quantity)
 	return true
 end
 
+-- AddPlayerItem: add an item to the authoritative player inventory
+-- Handles stacking with existing items of the same type
+-- Returns: true if successful, false if no room
+local ItemDB = require(Modules.ItemDatabase)
+local AddItemBF = Instance.new("BindableFunction")
+AddItemBF.Name = "AddPlayerItem"
+AddItemBF.Parent = game.ServerStorage
+AddItemBF.OnInvoke = function(player, itemId, quantity)
+	local state = PlayerStates[player]
+	if not state then return false end
+
+	local itemData = ItemDB.GetItem(itemId)
+	if not itemData then return false end
+
+	-- Check room: can we fit this quantity?
+	local remaining = quantity
+
+	-- Count space in existing stacks
+	if itemData.stackable then
+		for _, slot in ipairs(state.inventory) do
+			if slot.itemId == itemId and slot.quantity < itemData.maxStack then
+				remaining = remaining - (itemData.maxStack - slot.quantity)
+			end
+		end
+	end
+
+	-- Count empty slots needed
+	if remaining > 0 then
+		local slotsNeeded
+		if itemData.stackable then
+			slotsNeeded = math.ceil(remaining / itemData.maxStack)
+		else
+			slotsNeeded = remaining
+		end
+		if (#state.inventory + slotsNeeded) > state.maxSlots then
+			NotifyPlayers:FireClient(player, "Inventory full!", Color3.fromRGB(255, 100, 100))
+			return false
+		end
+	end
+
+	-- Actually add the items
+	remaining = quantity
+
+	-- Stack with existing
+	if itemData.stackable then
+		for _, slot in ipairs(state.inventory) do
+			if slot.itemId == itemId and slot.quantity < itemData.maxStack then
+				local canAdd = math.min(remaining, itemData.maxStack - slot.quantity)
+				slot.quantity = slot.quantity + canAdd
+				remaining = remaining - canAdd
+				if remaining <= 0 then break end
+			end
+		end
+	end
+
+	-- New slots for remainder
+	while remaining > 0 do
+		local addCount = 1
+		if itemData.stackable then
+			addCount = math.min(remaining, itemData.maxStack)
+		end
+		table.insert(state.inventory, {
+			itemId = itemId,
+			quantity = addCount,
+			spoilDay = itemData.spoilDays or -1,
+			pickedUpDay = GameState.currentDay,
+		})
+		remaining = remaining - addCount
+	end
+
+	UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
+	return true
+end
+
+-- HasPlayerRoom: check if player has room for an item without adding it
+local HasRoomBF = Instance.new("BindableFunction")
+HasRoomBF.Name = "HasPlayerRoom"
+HasRoomBF.Parent = game.ServerStorage
+HasRoomBF.OnInvoke = function(player, itemId, quantity)
+	local state = PlayerStates[player]
+	if not state then return false end
+
+	local itemData = ItemDB.GetItem(itemId)
+	if not itemData then return false end
+
+	local remaining = quantity
+
+	if itemData.stackable then
+		for _, slot in ipairs(state.inventory) do
+			if slot.itemId == itemId then
+				local space = itemData.maxStack - slot.quantity
+				if space >= remaining then return true end
+				remaining = remaining - space
+			end
+		end
+	end
+
+	local slotsNeeded = 1
+	if itemData.stackable then
+		slotsNeeded = math.ceil(remaining / itemData.maxStack)
+	else
+		slotsNeeded = remaining
+	end
+
+	return (#state.inventory + slotsNeeded) <= state.maxSlots
+end
+
+-- CountPlayerItem: count how many of an item the player has
+local CountItemBF = Instance.new("BindableFunction")
+CountItemBF.Name = "CountPlayerItem"
+CountItemBF.Parent = game.ServerStorage
+CountItemBF.OnInvoke = function(player, itemId)
+	local state = PlayerStates[player]
+	if not state then return 0 end
+
+	local count = 0
+	for _, slot in ipairs(state.inventory) do
+		if slot.itemId == itemId then
+			count = count + slot.quantity
+		end
+	end
+	return count
+end
+
+-- RemovePlayerItemById: remove items by ID from anywhere in inventory
+local RemoveByIdBF = Instance.new("BindableFunction")
+RemoveByIdBF.Name = "RemovePlayerItemById"
+RemoveByIdBF.Parent = game.ServerStorage
+RemoveByIdBF.OnInvoke = function(player, itemId, quantity)
+	local state = PlayerStates[player]
+	if not state then return false end
+
+	local remaining = quantity
+	for i = #state.inventory, 1, -1 do
+		local slot = state.inventory[i]
+		if slot.itemId == itemId then
+			local toRemove = math.min(remaining, slot.quantity)
+			slot.quantity = slot.quantity - toRemove
+			remaining = remaining - toRemove
+			if slot.quantity <= 0 then
+				table.remove(state.inventory, i)
+			end
+			if remaining <= 0 then break end
+		end
+	end
+
+	UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
+	return remaining <= 0
+end
+
+-- GetPlayerInventoryInfo: return inventory slot count and max slots
+local GetInvInfoBF = Instance.new("BindableFunction")
+GetInvInfoBF.Name = "GetPlayerInventoryInfo"
+GetInvInfoBF.Parent = game.ServerStorage
+GetInvInfoBF.OnInvoke = function(player)
+	local state = PlayerStates[player]
+	if not state then return { slotCount = 0, maxSlots = Config.Player.MaxInventorySlots } end
+	return { slotCount = #state.inventory, maxSlots = state.maxSlots }
+end
+
+-- UsePlayerItem: use/consume an item from the authoritative player inventory
+-- Handles food consumption, recipes, energy drinks, etc.
+local UseItemBF = Instance.new("BindableFunction")
+UseItemBF.Name = "UsePlayerItem"
+UseItemBF.Parent = game.ServerStorage
+UseItemBF.OnInvoke = function(player, slotIndex)
+	local state = PlayerStates[player]
+	if not state then return false end
+
+	local slot = state.inventory[slotIndex]
+	if not slot then return false end
+
+	local itemData = ItemDB.GetItem(slot.itemId)
+	if not itemData then return false end
+
+	-- Food consumption
+	if itemData.category == Enums.ItemCategory.Food and itemData.hungerRestore and itemData.hungerRestore > 0 then
+		-- Raw meat sickness check
+		if itemData.rawMeat then
+			if math.random() < Config.Food.SicknessChanceRaw then
+				NotifyPlayers:FireClient(player,
+					"You feel sick from eating raw meat...",
+					Color3.fromRGB(150, 200, 0)
+				)
+				table.insert(state.buffs, {
+					type = "Nausea",
+					amount = 1,
+					expiresAt = tick() + Config.Food.SicknessDuration,
+				})
+			end
+		end
+
+		-- Restore hunger
+		state.hunger = Utils.Clamp(
+			state.hunger + itemData.hungerRestore,
+			0, Config.Hunger.MaxHunger
+		)
+
+		-- Apply buff if any
+		if itemData.buff then
+			table.insert(state.buffs, {
+				type = itemData.buff.type,
+				amount = itemData.buff.amount,
+				expiresAt = tick() + (itemData.buff.duration or 0),
+			})
+			UpdateHUD:FireClient(player, "BuffApplied", itemData.buff)
+		end
+
+		NotifyPlayers:FireClient(player,
+			"Ate " .. itemData.name .. " (+" .. itemData.hungerRestore .. "% hunger)",
+			Color3.fromRGB(100, 255, 100)
+		)
+
+		-- Remove 1 from inventory
+		slot.quantity = slot.quantity - 1
+		if slot.quantity <= 0 then
+			table.remove(state.inventory, slotIndex)
+		end
+		UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
+		return true
+	end
+
+	-- Recipe card
+	if itemData.category == Enums.ItemCategory.Recipe then
+		local recipeId = itemData.recipeId
+		if recipeId and not state.knownRecipes[recipeId] then
+			state.knownRecipes[recipeId] = true
+			NotifyPlayers:FireClient(player,
+				"Learned recipe: " .. itemData.name,
+				Color3.fromRGB(255, 200, 50)
+			)
+			slot.quantity = slot.quantity - 1
+			if slot.quantity <= 0 then
+				table.remove(state.inventory, slotIndex)
+			end
+			UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
+		else
+			NotifyPlayers:FireClient(player,
+				"You already know this recipe.",
+				Color3.fromRGB(200, 200, 200)
+			)
+		end
+		return true
+	end
+
+	-- Energy drink
+	if slot.itemId == "energy_drink" then
+		state.stamina = 100
+		state.hunger = Utils.Clamp(state.hunger + 10, 0, Config.Hunger.MaxHunger)
+		if itemData.buff then
+			table.insert(state.buffs, {
+				type = itemData.buff.type,
+				amount = itemData.buff.amount,
+				expiresAt = tick() + (itemData.buff.duration or 0),
+			})
+		end
+		NotifyPlayers:FireClient(player, "Energy drink consumed! Full stamina!", Color3.fromRGB(0, 255, 255))
+		slot.quantity = slot.quantity - 1
+		if slot.quantity <= 0 then
+			table.remove(state.inventory, slotIndex)
+		end
+		UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
+		return true
+	end
+
+	return false
+end
+
 -- GetFortificationSlot: read a single fortification slot from authoritative state
 local GetFortSlotBF = Instance.new("BindableFunction")
 GetFortSlotBF.Name = "GetFortificationSlot"

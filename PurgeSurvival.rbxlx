@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version="1.0" encoding="utf-8"?>
 <roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="4">
   <External>null</External>
   <External>nil</External>
@@ -3510,6 +3510,274 @@ RemoveItemBF.OnInvoke = function(player, slotIndex, quantity)
 	return true
 end
 
+-- AddPlayerItem: add an item to the authoritative player inventory
+-- Handles stacking with existing items of the same type
+-- Returns: true if successful, false if no room
+local ItemDB = require(Modules.ItemDatabase)
+local AddItemBF = Instance.new("BindableFunction")
+AddItemBF.Name = "AddPlayerItem"
+AddItemBF.Parent = game.ServerStorage
+AddItemBF.OnInvoke = function(player, itemId, quantity)
+	local state = PlayerStates[player]
+	if not state then return false end
+
+	local itemData = ItemDB.GetItem(itemId)
+	if not itemData then return false end
+
+	-- Check room: can we fit this quantity?
+	local remaining = quantity
+
+	-- Count space in existing stacks
+	if itemData.stackable then
+		for _, slot in ipairs(state.inventory) do
+			if slot.itemId == itemId and slot.quantity &lt; itemData.maxStack then
+				remaining = remaining - (itemData.maxStack - slot.quantity)
+			end
+		end
+	end
+
+	-- Count empty slots needed
+	if remaining &gt; 0 then
+		local slotsNeeded
+		if itemData.stackable then
+			slotsNeeded = math.ceil(remaining / itemData.maxStack)
+		else
+			slotsNeeded = remaining
+		end
+		if (#state.inventory + slotsNeeded) &gt; state.maxSlots then
+			NotifyPlayers:FireClient(player, "Inventory full!", Color3.fromRGB(255, 100, 100))
+			return false
+		end
+	end
+
+	-- Actually add the items
+	remaining = quantity
+
+	-- Stack with existing
+	if itemData.stackable then
+		for _, slot in ipairs(state.inventory) do
+			if slot.itemId == itemId and slot.quantity &lt; itemData.maxStack then
+				local canAdd = math.min(remaining, itemData.maxStack - slot.quantity)
+				slot.quantity = slot.quantity + canAdd
+				remaining = remaining - canAdd
+				if remaining &lt;= 0 then break end
+			end
+		end
+	end
+
+	-- New slots for remainder
+	while remaining &gt; 0 do
+		local addCount = 1
+		if itemData.stackable then
+			addCount = math.min(remaining, itemData.maxStack)
+		end
+		table.insert(state.inventory, {
+			itemId = itemId,
+			quantity = addCount,
+			spoilDay = itemData.spoilDays or -1,
+			pickedUpDay = GameState.currentDay,
+		})
+		remaining = remaining - addCount
+	end
+
+	UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
+	return true
+end
+
+-- HasPlayerRoom: check if player has room for an item without adding it
+local HasRoomBF = Instance.new("BindableFunction")
+HasRoomBF.Name = "HasPlayerRoom"
+HasRoomBF.Parent = game.ServerStorage
+HasRoomBF.OnInvoke = function(player, itemId, quantity)
+	local state = PlayerStates[player]
+	if not state then return false end
+
+	local itemData = ItemDB.GetItem(itemId)
+	if not itemData then return false end
+
+	local remaining = quantity
+
+	if itemData.stackable then
+		for _, slot in ipairs(state.inventory) do
+			if slot.itemId == itemId then
+				local space = itemData.maxStack - slot.quantity
+				if space &gt;= remaining then return true end
+				remaining = remaining - space
+			end
+		end
+	end
+
+	local slotsNeeded = 1
+	if itemData.stackable then
+		slotsNeeded = math.ceil(remaining / itemData.maxStack)
+	else
+		slotsNeeded = remaining
+	end
+
+	return (#state.inventory + slotsNeeded) &lt;= state.maxSlots
+end
+
+-- CountPlayerItem: count how many of an item the player has
+local CountItemBF = Instance.new("BindableFunction")
+CountItemBF.Name = "CountPlayerItem"
+CountItemBF.Parent = game.ServerStorage
+CountItemBF.OnInvoke = function(player, itemId)
+	local state = PlayerStates[player]
+	if not state then return 0 end
+
+	local count = 0
+	for _, slot in ipairs(state.inventory) do
+		if slot.itemId == itemId then
+			count = count + slot.quantity
+		end
+	end
+	return count
+end
+
+-- RemovePlayerItemById: remove items by ID from anywhere in inventory
+local RemoveByIdBF = Instance.new("BindableFunction")
+RemoveByIdBF.Name = "RemovePlayerItemById"
+RemoveByIdBF.Parent = game.ServerStorage
+RemoveByIdBF.OnInvoke = function(player, itemId, quantity)
+	local state = PlayerStates[player]
+	if not state then return false end
+
+	local remaining = quantity
+	for i = #state.inventory, 1, -1 do
+		local slot = state.inventory[i]
+		if slot.itemId == itemId then
+			local toRemove = math.min(remaining, slot.quantity)
+			slot.quantity = slot.quantity - toRemove
+			remaining = remaining - toRemove
+			if slot.quantity &lt;= 0 then
+				table.remove(state.inventory, i)
+			end
+			if remaining &lt;= 0 then break end
+		end
+	end
+
+	UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
+	return remaining &lt;= 0
+end
+
+-- GetPlayerInventoryInfo: return inventory slot count and max slots
+local GetInvInfoBF = Instance.new("BindableFunction")
+GetInvInfoBF.Name = "GetPlayerInventoryInfo"
+GetInvInfoBF.Parent = game.ServerStorage
+GetInvInfoBF.OnInvoke = function(player)
+	local state = PlayerStates[player]
+	if not state then return { slotCount = 0, maxSlots = Config.Player.MaxInventorySlots } end
+	return { slotCount = #state.inventory, maxSlots = state.maxSlots }
+end
+
+-- UsePlayerItem: use/consume an item from the authoritative player inventory
+-- Handles food consumption, recipes, energy drinks, etc.
+local UseItemBF = Instance.new("BindableFunction")
+UseItemBF.Name = "UsePlayerItem"
+UseItemBF.Parent = game.ServerStorage
+UseItemBF.OnInvoke = function(player, slotIndex)
+	local state = PlayerStates[player]
+	if not state then return false end
+
+	local slot = state.inventory[slotIndex]
+	if not slot then return false end
+
+	local itemData = ItemDB.GetItem(slot.itemId)
+	if not itemData then return false end
+
+	-- Food consumption
+	if itemData.category == Enums.ItemCategory.Food and itemData.hungerRestore and itemData.hungerRestore &gt; 0 then
+		-- Raw meat sickness check
+		if itemData.rawMeat then
+			if math.random() &lt; Config.Food.SicknessChanceRaw then
+				NotifyPlayers:FireClient(player,
+					"You feel sick from eating raw meat...",
+					Color3.fromRGB(150, 200, 0)
+				)
+				table.insert(state.buffs, {
+					type = "Nausea",
+					amount = 1,
+					expiresAt = tick() + Config.Food.SicknessDuration,
+				})
+			end
+		end
+
+		-- Restore hunger
+		state.hunger = Utils.Clamp(
+			state.hunger + itemData.hungerRestore,
+			0, Config.Hunger.MaxHunger
+		)
+
+		-- Apply buff if any
+		if itemData.buff then
+			table.insert(state.buffs, {
+				type = itemData.buff.type,
+				amount = itemData.buff.amount,
+				expiresAt = tick() + (itemData.buff.duration or 0),
+			})
+			UpdateHUD:FireClient(player, "BuffApplied", itemData.buff)
+		end
+
+		NotifyPlayers:FireClient(player,
+			"Ate " .. itemData.name .. " (+" .. itemData.hungerRestore .. "% hunger)",
+			Color3.fromRGB(100, 255, 100)
+		)
+
+		-- Remove 1 from inventory
+		slot.quantity = slot.quantity - 1
+		if slot.quantity &lt;= 0 then
+			table.remove(state.inventory, slotIndex)
+		end
+		UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
+		return true
+	end
+
+	-- Recipe card
+	if itemData.category == Enums.ItemCategory.Recipe then
+		local recipeId = itemData.recipeId
+		if recipeId and not state.knownRecipes[recipeId] then
+			state.knownRecipes[recipeId] = true
+			NotifyPlayers:FireClient(player,
+				"Learned recipe: " .. itemData.name,
+				Color3.fromRGB(255, 200, 50)
+			)
+			slot.quantity = slot.quantity - 1
+			if slot.quantity &lt;= 0 then
+				table.remove(state.inventory, slotIndex)
+			end
+			UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
+		else
+			NotifyPlayers:FireClient(player,
+				"You already know this recipe.",
+				Color3.fromRGB(200, 200, 200)
+			)
+		end
+		return true
+	end
+
+	-- Energy drink
+	if slot.itemId == "energy_drink" then
+		state.stamina = 100
+		state.hunger = Utils.Clamp(state.hunger + 10, 0, Config.Hunger.MaxHunger)
+		if itemData.buff then
+			table.insert(state.buffs, {
+				type = itemData.buff.type,
+				amount = itemData.buff.amount,
+				expiresAt = tick() + (itemData.buff.duration or 0),
+			})
+		end
+		NotifyPlayers:FireClient(player, "Energy drink consumed! Full stamina!", Color3.fromRGB(0, 255, 255))
+		slot.quantity = slot.quantity - 1
+		if slot.quantity &lt;= 0 then
+			table.remove(state.inventory, slotIndex)
+		end
+		UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
+		return true
+	end
+
+	return false
+end
+
 -- GetFortificationSlot: read a single fortification slot from authoritative state
 local GetFortSlotBF = Instance.new("BindableFunction")
 GetFortSlotBF.Name = "GetFortificationSlot"
@@ -5477,6 +5745,9 @@ print("[LootService] Initialized")
 	InventoryService.server.lua
 	Server-authoritative inventory management
 	Handles picking up, dropping, using, and transferring items.
+
+	All inventory mutations are delegated to GameManager via BindableFunctions
+	to avoid the copy-on-invoke problem with BindableFunction tables.
 ]]
 
 local Players = game:GetService("Players")
@@ -5494,11 +5765,10 @@ local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local PickupItem = Remotes:WaitForChild("PickupItem")
 local DropItem = Remotes:WaitForChild("DropItem")
 local UseItem = Remotes:WaitForChild("UseItem")
-local UpdateHUD = Remotes:WaitForChild("UpdateHUD")
 local NotifyPlayers = Remotes:WaitForChild("NotifyPlayers")
 
 ------------------------------------------------------------------------
--- Helper: Get player state from GameManager
+-- Helper: Get read-only player state snapshot from GameManager
 ------------------------------------------------------------------------
 local function GetPlayerState(player: Player)
 	local getter = game.ServerStorage:FindFirstChild("GetPlayerState")
@@ -5509,165 +5779,60 @@ local function GetPlayerState(player: Player)
 end
 
 ------------------------------------------------------------------------
--- Inventory Operations
+-- Inventory Operations (all delegate to GameManager BindableFunctions)
 ------------------------------------------------------------------------
 local InventoryService = {}
 
-function InventoryService.GetInventory(player: Player): { any }
-	local state = GetPlayerState(player)
-	if not state then return {} end
-	return state.inventory
-end
-
-function InventoryService.GetSlotCount(player: Player): number
-	local state = GetPlayerState(player)
-	if not state then return 0 end
-	return #state.inventory
-end
-
-function InventoryService.GetMaxSlots(player: Player): number
-	local state = GetPlayerState(player)
-	if not state then return Config.Player.MaxInventorySlots end
-	return state.maxSlots
-end
-
-function InventoryService.HasRoom(player: Player, itemId: string, quantity: number): boolean
-	local state = GetPlayerState(player)
-	if not state then return false end
-
-	local itemData = ItemDatabase.GetItem(itemId)
-	if not itemData then return false end
-
-	-- Check if item can stack with existing
-	if itemData.stackable then
-		for _, slot in ipairs(state.inventory) do
-			if slot.itemId == itemId then
-				local spaceInStack = itemData.maxStack - slot.quantity
-				if spaceInStack &gt;= quantity then
-					return true
-				end
-				quantity -= spaceInStack
-			end
-		end
-	end
-
-	-- Need new slot(s)
-	local slotsNeeded = 1
-	if itemData.stackable then
-		slotsNeeded = math.ceil(quantity / itemData.maxStack)
-	else
-		slotsNeeded = quantity
-	end
-
-	return (#state.inventory + slotsNeeded) &lt;= state.maxSlots
-end
-
 function InventoryService.AddItem(player: Player, itemId: string, quantity: number): boolean
-	local state = GetPlayerState(player)
-	if not state then return false end
-
-	local itemData = ItemDatabase.GetItem(itemId)
-	if not itemData then
-		warn("[InventoryService] Unknown item:", itemId)
-		return false
-	end
-
-	if not InventoryService.HasRoom(player, itemId, quantity) then
-		NotifyPlayers:FireClient(player, "Inventory full!", Color3.fromRGB(255, 100, 100))
-		return false
-	end
-
-	local remaining = quantity
-
-	-- Try to stack with existing items
-	if itemData.stackable then
-		for _, slot in ipairs(state.inventory) do
-			if slot.itemId == itemId and slot.quantity &lt; itemData.maxStack then
-				local canAdd = math.min(remaining, itemData.maxStack - slot.quantity)
-				slot.quantity += canAdd
-				remaining -= canAdd
-				if remaining &lt;= 0 then break end
-			end
-		end
-	end
-
-	-- Add to new slots
-	while remaining &gt; 0 do
-		local addCount = 1
-		if itemData.stackable then
-			addCount = math.min(remaining, itemData.maxStack)
-		end
-		table.insert(state.inventory, {
-			itemId = itemId,
-			quantity = addCount,
-			spoilDay = itemData.spoilDays or -1,
-			pickedUpDay = 0, -- set by caller
-		})
-		remaining -= addCount
-	end
-
-	-- Send inventory update to client
-	UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
-	return true
+	local bf = game.ServerStorage:FindFirstChild("AddPlayerItem")
+	if not bf then return false end
+	return bf:Invoke(player, itemId, quantity)
 end
 
 function InventoryService.RemoveItem(player: Player, slotIndex: number, quantity: number): boolean
-	local state = GetPlayerState(player)
-	if not state then return false end
-
-	local slot = state.inventory[slotIndex]
-	if not slot then return false end
-
-	slot.quantity -= quantity
-	if slot.quantity &lt;= 0 then
-		table.remove(state.inventory, slotIndex)
-	end
-
-	UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
-	return true
+	local bf = game.ServerStorage:FindFirstChild("RemovePlayerItem")
+	if not bf then return false end
+	return bf:Invoke(player, slotIndex, quantity)
 end
 
 function InventoryService.RemoveItemById(player: Player, itemId: string, quantity: number): boolean
-	local state = GetPlayerState(player)
-	if not state then return false end
+	local bf = game.ServerStorage:FindFirstChild("RemovePlayerItemById")
+	if not bf then return false end
+	return bf:Invoke(player, itemId, quantity)
+end
 
-	local remaining = quantity
-	for i = #state.inventory, 1, -1 do
-		local slot = state.inventory[i]
-		if slot.itemId == itemId then
-			local toRemove = math.min(remaining, slot.quantity)
-			slot.quantity -= toRemove
-			remaining -= toRemove
-			if slot.quantity &lt;= 0 then
-				table.remove(state.inventory, i)
-			end
-			if remaining &lt;= 0 then break end
-		end
-	end
-
-	UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
-	return remaining &lt;= 0
+function InventoryService.HasRoom(player: Player, itemId: string, quantity: number): boolean
+	local bf = game.ServerStorage:FindFirstChild("HasPlayerRoom")
+	if not bf then return false end
+	return bf:Invoke(player, itemId, quantity)
 end
 
 function InventoryService.CountItem(player: Player, itemId: string): number
-	local state = GetPlayerState(player)
-	if not state then return 0 end
-
-	local count = 0
-	for _, slot in ipairs(state.inventory) do
-		if slot.itemId == itemId then
-			count += slot.quantity
-		end
-	end
-	return count
+	local bf = game.ServerStorage:FindFirstChild("CountPlayerItem")
+	if not bf then return 0 end
+	return bf:Invoke(player, itemId)
 end
 
 function InventoryService.HasItem(player: Player, itemId: string, quantity: number?): boolean
 	return InventoryService.CountItem(player, itemId) &gt;= (quantity or 1)
 end
 
--- Get a count map of all items { [itemId] = totalCount }
+function InventoryService.GetSlotCount(player: Player): number
+	local bf = game.ServerStorage:FindFirstChild("GetPlayerInventoryInfo")
+	if not bf then return 0 end
+	local info = bf:Invoke(player)
+	return info and info.slotCount or 0
+end
+
+function InventoryService.GetMaxSlots(player: Player): number
+	local bf = game.ServerStorage:FindFirstChild("GetPlayerInventoryInfo")
+	if not bf then return Config.Player.MaxInventorySlots end
+	local info = bf:Invoke(player)
+	return info and info.maxSlots or Config.Player.MaxInventorySlots
+end
+
 function InventoryService.GetItemCounts(player: Player): { [string]: number }
+	-- Read-only: snapshot is fine
 	local state = GetPlayerState(player)
 	if not state then return {} end
 
@@ -5722,15 +5887,14 @@ PickupItem.OnServerEvent:Connect(function(player, lootInstance)
 		return
 	end
 
-	-- Add to inventory (backpack)
+	-- Add to inventory via GameManager (authoritative)
 	if InventoryService.AddItem(player, itemId, quantity) then
 		-- Remove from world
 		lootInstance:Destroy()
 
 		local name = itemData.name or itemId
-		local state = GetPlayerState(player)
-		local slotCount = state and #state.inventory or 0
-		local maxSlots = state and state.maxSlots or Config.Player.MaxInventorySlots
+		local slotCount = InventoryService.GetSlotCount(player)
+		local maxSlots = InventoryService.GetMaxSlots(player)
 		NotifyPlayers:FireClient(player,
 			name .. (quantity &gt; 1 and (" x" .. quantity) or "") .. " stored in backpack [" .. slotCount .. "/" .. maxSlots .. "]",
 			Color3.fromRGB(200, 200, 255)
@@ -5742,6 +5906,7 @@ end)
 -- Drop Item to World
 ------------------------------------------------------------------------
 DropItem.OnServerEvent:Connect(function(player, slotIndex)
+	-- Read snapshot to get item info for the dropped part
 	local state = GetPlayerState(player)
 	if not state then return end
 
@@ -5756,6 +5921,13 @@ DropItem.OnServerEvent:Connect(function(player, slotIndex)
 	local itemData = ItemDatabase.GetItem(slot.itemId)
 	if not itemData then return end
 
+	-- Remove from authoritative inventory first
+	-- Remove the whole stack
+	local removeBF = game.ServerStorage:FindFirstChild("RemovePlayerItem")
+	if not removeBF then return end
+	local removed = removeBF:Invoke(player, slotIndex, slot.quantity)
+	if not removed then return end
+
 	-- Create dropped item in world
 	local droppedPart = Instance.new("Part")
 	droppedPart.Name = "DroppedItem_" .. slot.itemId
@@ -5767,6 +5939,14 @@ DropItem.OnServerEvent:Connect(function(player, slotIndex)
 	droppedPart:SetAttribute("ItemId", slot.itemId)
 	droppedPart:SetAttribute("Quantity", slot.quantity)
 	CollectionService:AddTag(droppedPart, "LootItem")
+
+	-- Add proximity prompt so it can be picked up again
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "Pick Up"
+	prompt.ObjectText = itemData.name
+	prompt.MaxActivationDistance = Config.Player.PickupRange
+	prompt.HoldDuration = 0.2
+	prompt.Parent = droppedPart
 
 	-- Add billboard for item name
 	local billboard = Instance.new("BillboardGui")
@@ -5785,102 +5965,16 @@ DropItem.OnServerEvent:Connect(function(player, slotIndex)
 	label.Parent = billboard
 
 	droppedPart.Parent = workspace:FindFirstChild("LootItems")
-
-	-- Remove from inventory
-	table.remove(state.inventory, slotIndex)
-	UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
 end)
 
 ------------------------------------------------------------------------
--- Use Item (eat food, use light source, etc.)
+-- Use Item (eat food, use consumable, etc.)
+-- Delegates actual state mutations to GameManager via UsePlayerItem BF
 ------------------------------------------------------------------------
 UseItem.OnServerEvent:Connect(function(player, slotIndex)
-	local state = GetPlayerState(player)
-	if not state then return end
-
-	local slot = state.inventory[slotIndex]
-	if not slot then return end
-
-	local itemData = ItemDatabase.GetItem(slot.itemId)
-	if not itemData then return end
-
-	-- Food consumption
-	if itemData.category == Enums.ItemCategory.Food and itemData.hungerRestore and itemData.hungerRestore &gt; 0 then
-		-- Raw meat sickness check
-		if itemData.rawMeat then
-			if math.random() &lt; Config.Food.SicknessChanceRaw then
-				NotifyPlayers:FireClient(player,
-					"You feel sick from eating raw meat...",
-					Color3.fromRGB(150, 200, 0)
-				)
-				-- Apply nausea debuff
-				table.insert(state.buffs, {
-					type = "Nausea",
-					amount = 1,
-					expiresAt = tick() + Config.Food.SicknessDuration,
-				})
-			end
-		end
-
-		-- Restore hunger
-		state.hunger = Utils.Clamp(
-			state.hunger + itemData.hungerRestore,
-			0, Config.Hunger.MaxHunger
-		)
-
-		-- Apply buff if any
-		if itemData.buff then
-			table.insert(state.buffs, {
-				type = itemData.buff.type,
-				amount = itemData.buff.amount,
-				expiresAt = tick() + (itemData.buff.duration or 0),
-			})
-			UpdateHUD:FireClient(player, "BuffApplied", itemData.buff)
-		end
-
-		NotifyPlayers:FireClient(player,
-			"Ate " .. itemData.name .. " (+" .. itemData.hungerRestore .. "% hunger)",
-			Color3.fromRGB(100, 255, 100)
-		)
-
-		InventoryService.RemoveItem(player, slotIndex, 1)
-		return
-	end
-
-	-- Recipe card
-	if itemData.category == Enums.ItemCategory.Recipe then
-		local recipeId = itemData.recipeId
-		if recipeId and not state.knownRecipes[recipeId] then
-			state.knownRecipes[recipeId] = true
-			NotifyPlayers:FireClient(player,
-				"Learned recipe: " .. itemData.name,
-				Color3.fromRGB(255, 200, 50)
-			)
-			InventoryService.RemoveItem(player, slotIndex, 1)
-		else
-			NotifyPlayers:FireClient(player,
-				"You already know this recipe.",
-				Color3.fromRGB(200, 200, 200)
-			)
-		end
-		return
-	end
-
-	-- Energy drink (instant use)
-	if slot.itemId == "energy_drink" then
-		state.stamina = 100
-		state.hunger = Utils.Clamp(state.hunger + 10, 0, Config.Hunger.MaxHunger)
-		if itemData.buff then
-			table.insert(state.buffs, {
-				type = itemData.buff.type,
-				amount = itemData.buff.amount,
-				expiresAt = tick() + (itemData.buff.duration or 0),
-			})
-		end
-		NotifyPlayers:FireClient(player, "Energy drink consumed! Full stamina!", Color3.fromRGB(0, 255, 255))
-		InventoryService.RemoveItem(player, slotIndex, 1)
-		return
-	end
+	local bf = game.ServerStorage:FindFirstChild("UsePlayerItem")
+	if not bf then return end
+	bf:Invoke(player, slotIndex)
 end)
 
 print("[InventoryService] Initialized")
@@ -5944,38 +6038,21 @@ end
 local LastAttackTime = {}  -- [player] = tick()
 
 ------------------------------------------------------------------------
--- Weapon Equip State
+-- Equipped Weapon Lookup
+-- Reads from GameManager's authoritative equippedWeapon field
 ------------------------------------------------------------------------
-local EquippedWeapons = {}  -- [player] = { itemId, slotIndex }
-
-EquipWeapon.OnServerEvent:Connect(function(player, slotIndex)
+local function GetEquippedWeapon(player)
 	local state = GetPlayerState(player)
-	if not state then return end
+	if not state or not state.equippedWeapon then return nil end
 
-	local slot = state.inventory[slotIndex]
-	if not slot then
-		EquippedWeapons[player] = nil
-		return
-	end
+	local itemData = ItemDatabase.GetItem(state.equippedWeapon)
+	if not itemData or itemData.category ~= Enums.ItemCategory.Weapon then return nil end
 
-	local itemData = ItemDatabase.GetItem(slot.itemId)
-	if not itemData or itemData.category ~= Enums.ItemCategory.Weapon then
-		EquippedWeapons[player] = nil
-		return
-	end
-
-	EquippedWeapons[player] = {
-		itemId = slot.itemId,
-		slotIndex = slotIndex,
+	return {
+		itemId = state.equippedWeapon,
 		data = itemData,
 	}
-
-	UpdateHUD:FireClient(player, "WeaponEquipped", {
-		name = itemData.name,
-		type = itemData.weaponType,
-		damage = itemData.damage,
-	})
-end)
+end
 
 ------------------------------------------------------------------------
 -- Melee Attack
@@ -5987,7 +6064,7 @@ MeleeAttack.OnServerEvent:Connect(function(player, targetModel)
 	-- Cooldown check
 	local now = tick()
 	local lastAttack = LastAttackTime[player] or 0
-	local weapon = EquippedWeapons[player]
+	local weapon = GetEquippedWeapon(player)
 	local cooldown = Config.Combat.MeleeSwingCooldown
 
 	if weapon and weapon.data then
@@ -6061,7 +6138,7 @@ RangedAttack.OnServerEvent:Connect(function(player, targetPosition, targetModel)
 	local state = GetPlayerState(player)
 	if not state or state.state ~= Enums.PlayerState.Alive then return end
 
-	local weapon = EquippedWeapons[player]
+	local weapon = GetEquippedWeapon(player)
 	if not weapon or not weapon.data or weapon.data.weaponType ~= "Ranged" then
 		NotifyPlayers:FireClient(player, "No ranged weapon equipped.", Color3.fromRGB(255, 100, 100))
 		return
@@ -6074,29 +6151,20 @@ RangedAttack.OnServerEvent:Connect(function(player, targetPosition, targetModel)
 	if now - lastAttack &lt; cooldown then return end
 	LastAttackTime[player] = now
 
-	-- Ammo check
+	-- Ammo check — use authoritative mutation via GameManager
 	local ammoType = weapon.data.ammoType
 	if ammoType then
-		local hasAmmo = false
-		for _, slot in ipairs(state.inventory) do
-			if slot.itemId == ammoType and slot.quantity &gt; 0 then
-				slot.quantity -= 1
-				if slot.quantity &lt;= 0 then
-					for i, s in ipairs(state.inventory) do
-						if s == slot then
-							table.remove(state.inventory, i)
-							break
-						end
-					end
-				end
-				hasAmmo = true
-				break
-			end
-		end
-
-		if not hasAmmo then
+		local countBF = game.ServerStorage:FindFirstChild("CountPlayerItem")
+		local ammoCount = countBF and countBF:Invoke(player, ammoType) or 0
+		if ammoCount &lt;= 0 then
 			NotifyPlayers:FireClient(player, "Out of ammo!", Color3.fromRGB(255, 100, 100))
 			return
+		end
+
+		-- Consume 1 ammo via authoritative removal
+		local removeBF = game.ServerStorage:FindFirstChild("RemovePlayerItemById")
+		if removeBF then
+			removeBF:Invoke(player, ammoType, 1)
 		end
 	end
 
@@ -6172,21 +6240,12 @@ RangedAttack.OnServerEvent:Connect(function(player, targetPosition, targetModel)
 		end
 	end
 
-	-- Mark in combat
-	state.isInCombat = true
-	task.delay(5, function()
-		if state then state.isInCombat = false end
-	end)
-
-	-- Update inventory (ammo consumed)
-	UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
 end)
 
 ------------------------------------------------------------------------
 -- Cleanup
 ------------------------------------------------------------------------
 Players.PlayerRemoving:Connect(function(player)
-	EquippedWeapons[player] = nil
 	LastAttackTime[player] = nil
 end)
 
@@ -9276,10 +9335,11 @@ local ReviveRequest = Remotes:WaitForChild("ReviveRequest")
 local InteractRequest = Remotes:WaitForChild("InteractRequest")
 local UpdateHUD = Remotes:WaitForChild("UpdateHUD")
 
+local EquipItem = Remotes:WaitForChild("EquipItem")
+
 local CombatRemotes = ReplicatedStorage:WaitForChild("CombatRemotes")
 local MeleeAttack = CombatRemotes:WaitForChild("MeleeAttack")
 local RangedAttack = CombatRemotes:WaitForChild("RangedAttack")
-local EquipWeapon = CombatRemotes:WaitForChild("EquipWeapon")
 
 ------------------------------------------------------------------------
 -- State
@@ -9408,7 +9468,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 
 	-- Equip weapon from hotbar (Q to quick-equip)
 	if input.KeyCode == Enum.KeyCode.Q then
-		EquipWeapon:FireServer(SelectedSlot)
+		EquipItem:FireServer(SelectedSlot)
 	end
 
 	-- Mouse click to attack

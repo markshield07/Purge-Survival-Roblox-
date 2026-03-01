@@ -27,10 +27,11 @@ local ReviveRequest = Remotes:WaitForChild("ReviveRequest")
 local InteractRequest = Remotes:WaitForChild("InteractRequest")
 local UpdateHUD = Remotes:WaitForChild("UpdateHUD")
 
+local EquipItem = Remotes:WaitForChild("EquipItem")
+
 local CombatRemotes = ReplicatedStorage:WaitForChild("CombatRemotes")
 local MeleeAttack = CombatRemotes:WaitForChild("MeleeAttack")
 local RangedAttack = CombatRemotes:WaitForChild("RangedAttack")
-local EquipWeapon = CombatRemotes:WaitForChild("EquipWeapon")
 
 ------------------------------------------------------------------------
 -- State
@@ -159,7 +160,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 
 	-- Equip weapon from hotbar (Q to quick-equip)
 	if input.KeyCode == Enum.KeyCode.Q then
-		EquipWeapon:FireServer(SelectedSlot)
+		EquipItem:FireServer(SelectedSlot)
 	end
 
 	-- Mouse click to attack

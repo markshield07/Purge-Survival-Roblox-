@@ -57,38 +57,21 @@ end
 local LastAttackTime = {}  -- [player] = tick()
 
 ------------------------------------------------------------------------
--- Weapon Equip State
+-- Equipped Weapon Lookup
+-- Reads from GameManager's authoritative equippedWeapon field
 ------------------------------------------------------------------------
-local EquippedWeapons = {}  -- [player] = { itemId, slotIndex }
-
-EquipWeapon.OnServerEvent:Connect(function(player, slotIndex)
+local function GetEquippedWeapon(player)
 	local state = GetPlayerState(player)
-	if not state then return end
+	if not state or not state.equippedWeapon then return nil end
 
-	local slot = state.inventory[slotIndex]
-	if not slot then
-		EquippedWeapons[player] = nil
-		return
-	end
+	local itemData = ItemDatabase.GetItem(state.equippedWeapon)
+	if not itemData or itemData.category ~= Enums.ItemCategory.Weapon then return nil end
 
-	local itemData = ItemDatabase.GetItem(slot.itemId)
-	if not itemData or itemData.category ~= Enums.ItemCategory.Weapon then
-		EquippedWeapons[player] = nil
-		return
-	end
-
-	EquippedWeapons[player] = {
-		itemId = slot.itemId,
-		slotIndex = slotIndex,
+	return {
+		itemId = state.equippedWeapon,
 		data = itemData,
 	}
-
-	UpdateHUD:FireClient(player, "WeaponEquipped", {
-		name = itemData.name,
-		type = itemData.weaponType,
-		damage = itemData.damage,
-	})
-end)
+end
 
 ------------------------------------------------------------------------
 -- Melee Attack
@@ -100,7 +83,7 @@ MeleeAttack.OnServerEvent:Connect(function(player, targetModel)
 	-- Cooldown check
 	local now = tick()
 	local lastAttack = LastAttackTime[player] or 0
-	local weapon = EquippedWeapons[player]
+	local weapon = GetEquippedWeapon(player)
 	local cooldown = Config.Combat.MeleeSwingCooldown
 
 	if weapon and weapon.data then
@@ -174,7 +157,7 @@ RangedAttack.OnServerEvent:Connect(function(player, targetPosition, targetModel)
 	local state = GetPlayerState(player)
 	if not state or state.state ~= Enums.PlayerState.Alive then return end
 
-	local weapon = EquippedWeapons[player]
+	local weapon = GetEquippedWeapon(player)
 	if not weapon or not weapon.data or weapon.data.weaponType ~= "Ranged" then
 		NotifyPlayers:FireClient(player, "No ranged weapon equipped.", Color3.fromRGB(255, 100, 100))
 		return
@@ -187,29 +170,20 @@ RangedAttack.OnServerEvent:Connect(function(player, targetPosition, targetModel)
 	if now - lastAttack < cooldown then return end
 	LastAttackTime[player] = now
 
-	-- Ammo check
+	-- Ammo check — use authoritative mutation via GameManager
 	local ammoType = weapon.data.ammoType
 	if ammoType then
-		local hasAmmo = false
-		for _, slot in ipairs(state.inventory) do
-			if slot.itemId == ammoType and slot.quantity > 0 then
-				slot.quantity -= 1
-				if slot.quantity <= 0 then
-					for i, s in ipairs(state.inventory) do
-						if s == slot then
-							table.remove(state.inventory, i)
-							break
-						end
-					end
-				end
-				hasAmmo = true
-				break
-			end
-		end
-
-		if not hasAmmo then
+		local countBF = game.ServerStorage:FindFirstChild("CountPlayerItem")
+		local ammoCount = countBF and countBF:Invoke(player, ammoType) or 0
+		if ammoCount <= 0 then
 			NotifyPlayers:FireClient(player, "Out of ammo!", Color3.fromRGB(255, 100, 100))
 			return
+		end
+
+		-- Consume 1 ammo via authoritative removal
+		local removeBF = game.ServerStorage:FindFirstChild("RemovePlayerItemById")
+		if removeBF then
+			removeBF:Invoke(player, ammoType, 1)
 		end
 	end
 
@@ -285,21 +259,12 @@ RangedAttack.OnServerEvent:Connect(function(player, targetPosition, targetModel)
 		end
 	end
 
-	-- Mark in combat
-	state.isInCombat = true
-	task.delay(5, function()
-		if state then state.isInCombat = false end
-	end)
-
-	-- Update inventory (ammo consumed)
-	UpdateHUD:FireClient(player, "InventoryUpdate", state.inventory)
 end)
 
 ------------------------------------------------------------------------
 -- Cleanup
 ------------------------------------------------------------------------
 Players.PlayerRemoving:Connect(function(player)
-	EquippedWeapons[player] = nil
 	LastAttackTime[player] = nil
 end)
 
