@@ -258,11 +258,12 @@ function FortificationService.UpdateSlotVisual(slotName: string, slotData)
 	for _, part in ipairs(slotParts) do
 		if part:GetAttribute("SlotName") == slotName then
 			if slotData.materialId then
-				-- Show fortified appearance
+				-- Show fortified appearance (solid barrier)
 				local itemData = ItemDatabase.GetItem(slotData.materialId)
 				local tierColor = Enums.TierColor[itemData and itemData.tier or "Common"]
 				part.Color = tierColor or Color3.fromRGB(139, 90, 43)
 				part.Transparency = 0
+				part.CanCollide = true
 				part.Material = Enum.Material.Wood
 
 				if itemData and itemData.tier == "Rare" then
@@ -271,8 +272,9 @@ function FortificationService.UpdateSlotVisual(slotName: string, slotData)
 					part.Material = Enum.Material.Neon
 				end
 			else
-				-- Show broken / unfortified
+				-- Show broken / unfortified (walk-through)
 				part.Transparency = 0.5
+				part.CanCollide = false
 				part.Color = Color3.fromRGB(80, 50, 30)
 				part.Material = Enum.Material.Wood
 			end

@@ -378,7 +378,7 @@ local function CreateHouse(position: Vector3, zone: number, houseIndex: number, 
 			Attributes = { StationType = "FullKitchen", Built = false },
 		})
 
-		-- Wall sections to fortify
+		-- Wall sections to fortify (non-solid placeholders, become solid when fortified)
 		for i = 1, Config.Fortification.WallSectionCount do
 			local angle = (i / Config.Fortification.WallSectionCount) * math.pi * 2
 			local wx = math.cos(angle) * (w / 2)
@@ -390,6 +390,7 @@ local function CreateHouse(position: Vector3, zone: number, houseIndex: number, 
 				Material = Materials.HouseWall.material,
 				Color = Color3.fromRGB(80, 60, 45),
 				Transparency = 0.6,
+				CanCollide = false,
 				Parent = houseFolder,
 				Tags = { "FortSlot" },
 				Attributes = { SlotName = "Wall_" .. i },
