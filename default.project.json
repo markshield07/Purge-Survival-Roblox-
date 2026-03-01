@@ -1,0 +1,59 @@
+{
+  "name": "ThePurge-SuburbanSurvival",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "Shared": {
+        "$path": "src/shared"
+      }
+    },
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "Server": {
+        "$path": "src/server"
+      }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "Client": {
+          "$path": "src/client"
+        }
+      }
+    },
+    "Lighting": {
+      "$className": "Lighting",
+      "Atmosphere": {
+        "$className": "Atmosphere",
+        "Density": { "$value": 0.3 },
+        "Offset": { "$value": 0.25 }
+      }
+    },
+    "SoundService": {
+      "$className": "SoundService"
+    },
+    "Workspace": {
+      "$className": "Workspace",
+      "Map": {
+        "$className": "Folder"
+      },
+      "NPCs": {
+        "$className": "Folder"
+      },
+      "Wildlife": {
+        "$className": "Folder"
+      },
+      "PurgeEnemies": {
+        "$className": "Folder"
+      },
+      "LootItems": {
+        "$className": "Folder"
+      },
+      "SpawnPoints": {
+        "$className": "Folder"
+      }
+    }
+  }
+}
