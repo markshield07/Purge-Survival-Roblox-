@@ -7161,24 +7161,82 @@ local function CreateHouse(position: Vector3, zone: number, houseIndex: number, 
 		Parent = houseFolder,
 	})
 
-	-- Walls
-	local walls = {
-		{ name = "WallFront", size = Vector3.new(w, h, 1), offset = Vector3.new(0, h / 2 + 0.5, -d / 2) },
-		{ name = "WallBack", size = Vector3.new(w, h, 1), offset = Vector3.new(0, h / 2 + 0.5, d / 2) },
-		{ name = "WallLeft", size = Vector3.new(1, h, d), offset = Vector3.new(-w / 2, h / 2 + 0.5, 0) },
-		{ name = "WallRight", size = Vector3.new(1, h, d), offset = Vector3.new(w / 2, h / 2 + 0.5, 0) },
-	}
+	-- Walls (with doorway gaps in front and back)
+	local doorWidth = 4
+	local doorHeight = 7
+	local sideWidth = (w - doorWidth) / 2  -- width of each wall segment beside door
 
-	for _, wallData in ipairs(walls) do
-		CreatePart({
-			Name = wallData.name,
-			Size = wallData.size,
-			Position = position + wallData.offset,
-			Material = Materials.HouseWall.material,
-			Color = wallColor,
-			Parent = houseFolder,
-		})
-	end
+	-- Front wall: split into left, right, and header above door
+	CreatePart({
+		Name = "WallFrontLeft",
+		Size = Vector3.new(sideWidth, h, 1),
+		Position = position + Vector3.new(-(sideWidth / 2 + doorWidth / 2), h / 2 + 0.5, -d / 2),
+		Material = Materials.HouseWall.material,
+		Color = wallColor,
+		Parent = houseFolder,
+	})
+	CreatePart({
+		Name = "WallFrontRight",
+		Size = Vector3.new(sideWidth, h, 1),
+		Position = position + Vector3.new(sideWidth / 2 + doorWidth / 2, h / 2 + 0.5, -d / 2),
+		Material = Materials.HouseWall.material,
+		Color = wallColor,
+		Parent = houseFolder,
+	})
+	-- Header above front door
+	CreatePart({
+		Name = "WallFrontHeader",
+		Size = Vector3.new(doorWidth, h - doorHeight, 1),
+		Position = position + Vector3.new(0, doorHeight + (h - doorHeight) / 2 + 0.5, -d / 2),
+		Material = Materials.HouseWall.material,
+		Color = wallColor,
+		Parent = houseFolder,
+	})
+
+	-- Back wall: split into left, right, and header above door
+	CreatePart({
+		Name = "WallBackLeft",
+		Size = Vector3.new(sideWidth, h, 1),
+		Position = position + Vector3.new(-(sideWidth / 2 + doorWidth / 2), h / 2 + 0.5, d / 2),
+		Material = Materials.HouseWall.material,
+		Color = wallColor,
+		Parent = houseFolder,
+	})
+	CreatePart({
+		Name = "WallBackRight",
+		Size = Vector3.new(sideWidth, h, 1),
+		Position = position + Vector3.new(sideWidth / 2 + doorWidth / 2, h / 2 + 0.5, d / 2),
+		Material = Materials.HouseWall.material,
+		Color = wallColor,
+		Parent = houseFolder,
+	})
+	-- Header above back door
+	CreatePart({
+		Name = "WallBackHeader",
+		Size = Vector3.new(doorWidth, h - doorHeight, 1),
+		Position = position + Vector3.new(0, doorHeight + (h - doorHeight) / 2 + 0.5, d / 2),
+		Material = Materials.HouseWall.material,
+		Color = wallColor,
+		Parent = houseFolder,
+	})
+
+	-- Side walls (solid, no doors)
+	CreatePart({
+		Name = "WallLeft",
+		Size = Vector3.new(1, h, d),
+		Position = position + Vector3.new(-w / 2, h / 2 + 0.5, 0),
+		Material = Materials.HouseWall.material,
+		Color = wallColor,
+		Parent = houseFolder,
+	})
+	CreatePart({
+		Name = "WallRight",
+		Size = Vector3.new(1, h, d),
+		Position = position + Vector3.new(w / 2, h / 2 + 0.5, 0),
+		Material = Materials.HouseWall.material,
+		Color = wallColor,
+		Parent = houseFolder,
+	})
 
 	-- Roof
 	CreatePart({
@@ -7190,29 +7248,29 @@ local function CreateHouse(position: Vector3, zone: number, houseIndex: number, 
 		Parent = houseFolder,
 	})
 
-	-- Front door
+	-- Front door (walk-through by default, becomes solid when fortified)
 	local doorPart = CreatePart({
 		Name = "FrontDoor",
 		Size = Vector3.new(4, 7, 1.2),
 		Position = position + Vector3.new(0, 4, -d / 2),
 		Material = Materials.Door.material,
 		Color = Materials.Door.color,
+		CanCollide = false,
+		Transparency = 0.5,
 		Parent = houseFolder,
 		Tags = { "FortSlot" },
 		Attributes = { SlotName = "FrontDoor" },
 	})
 
-	if isStarter then
-		doorPart.Transparency = 0.5  -- busted door
-	end
-
-	-- Back door
+	-- Back door (walk-through by default, becomes solid when fortified)
 	local backDoor = CreatePart({
 		Name = "BackDoor",
 		Size = Vector3.new(4, 7, 1.2),
 		Position = position + Vector3.new(0, 4, d / 2),
 		Material = Materials.Door.material,
 		Color = Materials.Door.color,
+		CanCollide = false,
+		Transparency = 0.5,
 		Parent = houseFolder,
 		Tags = { "FortSlot" },
 		Attributes = { SlotName = "BackDoor" },
