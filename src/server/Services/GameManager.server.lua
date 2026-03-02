@@ -668,11 +668,22 @@ RunService.Heartbeat:Connect(function(dt)
 	GameState.dayTimeElapsed += dt
 	if GameState.dayTimeElapsed >= Config.DayCycle.DayLengthSeconds then
 		GameState.dayTimeElapsed = 0
-		GameState.currentDay += 1
+
+		-- Apply day multiplier from rescued people
+		local dayMultiplier = 1
+		local GetDayMultiplier = game.ServerStorage:FindFirstChild("GetDayMultiplier")
+		if GetDayMultiplier then
+			dayMultiplier = GetDayMultiplier:Invoke()
+		end
+		GameState.currentDay += dayMultiplier
 		lastDayNumber = GameState.currentDay
 
 		DayChanged:FireAllClients(GameState.currentDay)
-		NotifyPlayers:FireAllClients("Day " .. GameState.currentDay, Color3.fromRGB(255, 200, 50))
+		local dayMsg = "Day " .. GameState.currentDay
+		if dayMultiplier > 1 then
+			dayMsg = dayMsg .. " (x" .. dayMultiplier .. " multiplier)"
+		end
+		NotifyPlayers:FireAllClients(dayMsg, Color3.fromRGB(255, 200, 50))
 		CheckFoodSpoilage()
 	end
 
@@ -1277,6 +1288,23 @@ end)
 local expandSignal = Instance.new("BindableEvent")
 expandSignal.Name = "ExpandBaseSignal"
 expandSignal.Parent = game.ServerStorage
+
+------------------------------------------------------------------------
+-- SetPlayerMaxSlots: modify max inventory slots (for sack upgrades)
+------------------------------------------------------------------------
+local SetMaxSlotsBF = Instance.new("BindableFunction")
+SetMaxSlotsBF.Name = "SetPlayerMaxSlots"
+SetMaxSlotsBF.Parent = game.ServerStorage
+SetMaxSlotsBF.OnInvoke = function(player, newMax)
+	local state = PlayerStates[player]
+	if not state then return false end
+	if newMax > state.maxSlots then
+		state.maxSlots = newMax
+		UpdateHUD:FireClient(player, "BackpackUpgrade", state.maxSlots)
+		return true
+	end
+	return false
+end
 
 ------------------------------------------------------------------------
 -- Replicated Power State (for home waypoint visibility)

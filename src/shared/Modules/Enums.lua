@@ -165,4 +165,59 @@ Enums.GameMode = {
 	Escape = "Escape",
 }
 
+-- Campfire tier
+Enums.CampfireTier = {
+	Flickering = 1,
+	Steady = 2,
+	Roaring = 3,
+	Blazing = 4,
+	Eternal = 5,
+}
+
+-- Stalker state (unkillable night hunter)
+Enums.StalkerState = {
+	Dormant = "Dormant",
+	Hunting = "Hunting",
+	Chasing = "Chasing",
+	Stunned = "Stunned",
+	Hungry = "Hungry",
+	Fleeing = "Fleeing",
+}
+
+-- Crafting bench tier
+Enums.BenchTier = {
+	Tier1 = 1,
+	Tier2 = 2,
+	Tier3 = 3,
+	Tier4 = 4,
+	Tier5 = 5,
+}
+
+-- Resource types
+Enums.ResourceType = {
+	Wood = "Wood",
+	Scrap = "Scrap",
+	Bolts = "Bolts",
+	CultistGem = "CultistGem",
+	ForestGem = "ForestGem",
+}
+
+-- Night event types
+Enums.NightEvent = {
+	CultistRaid = "CultistRaid",
+	MeteorShower = "MeteorShower",
+	FrogInvasion = "FrogInvasion",
+	AlienVisit = "AlienVisit",
+	BloodMoon = "BloodMoon",
+	ThunderStorm = "ThunderStorm",
+}
+
+-- Rescue state
+Enums.RescueState = {
+	Hidden = "Hidden",
+	Discovered = "Discovered",
+	Rescuing = "Rescuing",
+	Rescued = "Rescued",
+}
+
 return Enums

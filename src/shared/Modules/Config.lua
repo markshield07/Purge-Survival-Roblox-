@@ -251,6 +251,137 @@ Config.Map = {
 }
 
 ------------------------------------------------------------------------
+-- Campfire (central safe zone, inspired by 99 Nights in the Forest)
+------------------------------------------------------------------------
+Config.Campfire = {
+	SafeZoneRadius = 25,              -- studs; enemies won't enter this radius while fire is lit
+	BaseFuelCapacity = 100,           -- max fuel for the campfire
+	FuelDrainPerSecond = 0.3,         -- how fast fuel burns at night
+	DayDrainMultiplier = 0.1,         -- 10% drain during day (mostly burns at night)
+	ExtinguishDangerDelay = 5,        -- seconds after fire dies before Stalker can enter
+	RelightFuelCost = 10,             -- min fuel needed to relight
+	WarmthRegenPerSecond = 0.5,       -- HP regen per second while near campfire
+	HungerDrainReduction = 0.5,       -- 50% less hunger drain near campfire
+	-- Upgrade tiers (expand safe zone, unlock features)
+	Tiers = {
+		[1] = { radius = 25,  fuelCapacity = 100, mapRadius = 300,  name = "Flickering Campfire" },
+		[2] = { radius = 35,  fuelCapacity = 150, mapRadius = 500,  name = "Steady Campfire" },
+		[3] = { radius = 45,  fuelCapacity = 200, mapRadius = 700,  name = "Roaring Campfire" },
+		[4] = { radius = 55,  fuelCapacity = 275, mapRadius = 900,  name = "Blazing Bonfire" },
+		[5] = { radius = 65,  fuelCapacity = 350, mapRadius = 1200, name = "Eternal Flame" },
+	},
+	-- Upgrade costs per tier
+	UpgradeCosts = {
+		[2] = { wood = 10, scrap = 3 },
+		[3] = { wood = 25, scrap = 10 },
+		[4] = { wood = 50, scrap = 25, cultist_gem = 1 },
+		[5] = { wood = 80, scrap = 50, forest_gem = 1 },
+	},
+}
+
+------------------------------------------------------------------------
+-- The Stalker (unkillable night hunter, inspired by The Deer)
+------------------------------------------------------------------------
+Config.Stalker = {
+	SpawnDay = 2,                     -- first appears on night 2
+	BaseSpeed = 30,                   -- base walkspeed
+	ChaseSpeedIncrease = 0.5,         -- speed increase per second of chase
+	MaxChaseSpeed = 50,               -- cap on chase speed
+	Damage = 25,                      -- damage per hit
+	DamageScalePerDay = 0.5,          -- +0.5 damage per day passed
+	AttackCooldown = 2.0,             -- seconds between attacks
+	FlashlightStunDuration = 3,       -- seconds stunned by flashlight
+	CampfireRepelRadius = -1,         -- uses campfire safe zone radius (-1 = auto)
+	DespawnAtDawn = true,             -- disappears when day starts
+	HungryChance = 0.15,             -- 15% chance per night to be "hungry"
+	HungrySpeedBoost = 1.4,          -- 40% faster when hungry
+	HungryDamageBoost = 1.5,         -- 50% more damage when hungry
+	HungryStunResist = 0.5,          -- flashlight only half as effective
+	DetectionRadius = 150,            -- how far it can sense players
+	LoseInterestTime = 15,           -- seconds before losing interest if can't reach player
+}
+
+------------------------------------------------------------------------
+-- Crafting Bench (tiered crafting like 99 Nights)
+------------------------------------------------------------------------
+Config.CraftingBench = {
+	MaxTier = 5,
+	-- Upgrade costs for each bench tier
+	UpgradeCosts = {
+		[2] = { wood = 5, scrap = 1 },
+		[3] = { wood = 15, scrap = 10 },
+		[4] = { wood = 30, scrap = 20, cultist_gem = 2 },
+		[5] = { wood = 50, scrap = 50, forest_gem = 1 },
+	},
+}
+
+------------------------------------------------------------------------
+-- Resource Gathering
+------------------------------------------------------------------------
+Config.Gathering = {
+	-- Tree chopping
+	TreeChopTime = 2.0,              -- seconds per chop
+	WoodPerChop = 2,                  -- wood gained per chop
+	TreeHealth = 6,                   -- chops to fell a tree
+	TreeRespawnDays = 2,              -- days before tree regrows
+	-- Junk grinding (at Grinder by campfire)
+	GrindTime = 1.5,                 -- seconds to grind one item
+	-- Scrap yields based on junk quality
+	ScrapYields = {
+		broken_fan = 3,
+		broken_radio = 2,
+		old_tire = 2,
+		metal_chair = 4,
+		broken_microwave = 5,
+		scrap_metal = 1,
+	},
+}
+
+------------------------------------------------------------------------
+-- Rescue Objectives (find missing people to speed up day counter)
+------------------------------------------------------------------------
+Config.Rescue = {
+	TotalMissing = 4,                 -- 4 people to find
+	DaySpeedupPerRescue = 1,          -- each rescue adds +1 day counter per cycle
+	SearchRadius = 15,                -- how close player must be to "find" them
+	RescueTime = 5,                   -- seconds to complete rescue
+	-- Spawn zones (min distance from campfire)
+	SpawnDistances = { 200, 400, 600, 800 },
+	Rewards = {
+		[1] = { scrap = 50, item = "flashlight" },
+		[2] = { scrap = 100, item = "good_sack" },
+		[3] = { scrap = 150, item = "cultist_gem" },
+		[4] = { scrap = 250, item = "forest_gem" },
+	},
+}
+
+------------------------------------------------------------------------
+-- Night Events (random events during nighttime)
+------------------------------------------------------------------------
+Config.NightEvents = {
+	ChancePerNight = 0.30,           -- 30% chance of a random event each night
+	MinDayForEvents = 3,             -- events start after day 3
+	Events = {
+		CultistRaid = { weight = 40, minDay = 3 },
+		MeteorShower = { weight = 15, minDay = 8 },
+		FrogInvasion = { weight = 15, minDay = 5 },
+		AlienVisit = { weight = 10, minDay = 10 },
+		BloodMoon = { weight = 10, minDay = 15 },
+		ThunderStorm = { weight = 10, minDay = 5 },
+	},
+}
+
+------------------------------------------------------------------------
+-- Sack/Backpack Progression
+------------------------------------------------------------------------
+Config.Sacks = {
+	old_sack = { slots = 5, name = "Old Sack" },
+	good_sack = { slots = 15, name = "Good Sack" },
+	infernal_sack = { slots = 20, name = "Infernal Sack", cooksFood = true },
+	giant_sack = { slots = 25, name = "Giant Sack" },
+}
+
+------------------------------------------------------------------------
 -- Monetization Product IDs (placeholder)
 ------------------------------------------------------------------------
 Config.GamePasses = {

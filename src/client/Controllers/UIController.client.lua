@@ -1003,4 +1003,228 @@ task.defer(function()
 	end
 end)
 
+------------------------------------------------------------------------
+-- Campfire Fuel Display (top-center)
+------------------------------------------------------------------------
+local CampfireFrame = CreateFrame({
+	Name = "CampfireFrame",
+	Size = UDim2.new(0, 200, 0, 50),
+	Position = UDim2.new(0.5, 0, 0, 10),
+	AnchorPoint = Vector2.new(0.5, 0),
+	BackgroundColor3 = Color3.fromRGB(40, 20, 0),
+	BackgroundTransparency = 0.3,
+	Corner = 8,
+})
+
+local campfireIcon = CreateLabel({
+	Name = "CampfireIcon",
+	Text = "🔥",
+	Size = UDim2.new(0, 40, 1, 0),
+	Position = UDim2.new(0, 5, 0, 0),
+	Parent = CampfireFrame,
+	TextColor3 = Color3.fromRGB(255, 150, 30),
+	TextScaled = true,
+})
+
+local campfireFuelBar = Instance.new("Frame")
+campfireFuelBar.Name = "FuelBar"
+campfireFuelBar.Size = UDim2.new(0.6, 0, 0.4, 0)
+campfireFuelBar.Position = UDim2.new(0.25, 0, 0.15, 0)
+campfireFuelBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+campfireFuelBar.BorderSizePixel = 0
+campfireFuelBar.Parent = CampfireFrame
+
+local campfireFuelFill = Instance.new("Frame")
+campfireFuelFill.Name = "Fill"
+campfireFuelFill.Size = UDim2.new(0.6, 0, 1, 0)
+campfireFuelFill.BackgroundColor3 = Color3.fromRGB(255, 150, 30)
+campfireFuelFill.BorderSizePixel = 0
+campfireFuelFill.Parent = campfireFuelBar
+
+local campfireTierLabel = CreateLabel({
+	Name = "TierLabel",
+	Text = "Flickering Campfire",
+	Size = UDim2.new(0.75, 0, 0.4, 0),
+	Position = UDim2.new(0.25, 0, 0.55, 0),
+	Parent = CampfireFrame,
+	TextColor3 = Color3.fromRGB(255, 200, 100),
+	TextSize = 11,
+})
+
+------------------------------------------------------------------------
+-- Stalker Warning Indicator
+------------------------------------------------------------------------
+local StalkerFrame = CreateFrame({
+	Name = "StalkerWarning",
+	Size = UDim2.new(0, 300, 0, 40),
+	Position = UDim2.new(0.5, 0, 0, 65),
+	AnchorPoint = Vector2.new(0.5, 0),
+	BackgroundColor3 = Color3.fromRGB(60, 0, 0),
+	BackgroundTransparency = 0.4,
+	Corner = 6,
+})
+StalkerFrame.Visible = false
+
+local stalkerLabel = CreateLabel({
+	Name = "StalkerLabel",
+	Text = "THE STALKER IS HUNTING...",
+	Size = UDim2.new(1, -10, 1, 0),
+	Position = UDim2.new(0, 5, 0, 0),
+	Parent = StalkerFrame,
+	TextColor3 = Color3.fromRGB(255, 50, 50),
+	TextSize = 14,
+	Font = Enum.Font.GothamBold,
+})
+
+------------------------------------------------------------------------
+-- Rescue Progress Display (top-right)
+------------------------------------------------------------------------
+local RescueFrame = CreateFrame({
+	Name = "RescueFrame",
+	Size = UDim2.new(0, 180, 0, 35),
+	Position = UDim2.new(1, -10, 0, 10),
+	AnchorPoint = Vector2.new(1, 0),
+	BackgroundColor3 = Color3.fromRGB(0, 30, 50),
+	BackgroundTransparency = 0.3,
+	Corner = 6,
+})
+
+local rescueLabel = CreateLabel({
+	Name = "RescueLabel",
+	Text = "Missing: 0/4 rescued",
+	Size = UDim2.new(1, -10, 1, 0),
+	Position = UDim2.new(0, 5, 0, 0),
+	Parent = RescueFrame,
+	TextColor3 = Color3.fromRGB(100, 200, 255),
+	TextSize = 12,
+})
+
+------------------------------------------------------------------------
+-- Night Event Display
+------------------------------------------------------------------------
+local EventFrame = CreateFrame({
+	Name = "EventFrame",
+	Size = UDim2.new(0, 300, 0, 35),
+	Position = UDim2.new(0.5, 0, 0, 110),
+	AnchorPoint = Vector2.new(0.5, 0),
+	BackgroundColor3 = Color3.fromRGB(50, 0, 50),
+	BackgroundTransparency = 0.4,
+	Corner = 6,
+})
+EventFrame.Visible = false
+
+local eventLabel = CreateLabel({
+	Name = "EventLabel",
+	Text = "",
+	Size = UDim2.new(1, -10, 1, 0),
+	Position = UDim2.new(0, 5, 0, 0),
+	Parent = EventFrame,
+	TextColor3 = Color3.fromRGB(255, 200, 100),
+	TextSize = 13,
+	Font = Enum.Font.GothamBold,
+})
+
+------------------------------------------------------------------------
+-- Connect New Remotes
+------------------------------------------------------------------------
+
+-- Campfire updates
+local CampfireUpdateRemote = Remotes:FindFirstChild("CampfireUpdate")
+if CampfireUpdateRemote then
+	CampfireUpdateRemote.OnClientEvent:Connect(function(eventType, state)
+		if type(state) == "table" then
+			-- Update fuel bar
+			local fuelPercent = (state.fuel or 0) / math.max(1, state.maxFuel or 100)
+			campfireFuelFill.Size = UDim2.new(math.clamp(fuelPercent, 0, 1), 0, 1, 0)
+
+			-- Color based on fuel level
+			if fuelPercent > 0.5 then
+				campfireFuelFill.BackgroundColor3 = Color3.fromRGB(255, 150, 30)
+			elseif fuelPercent > 0.2 then
+				campfireFuelFill.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
+			else
+				campfireFuelFill.BackgroundColor3 = Color3.fromRGB(255, 30, 0)
+			end
+
+			-- Update tier name
+			local tierData = Config.Campfire.Tiers[state.tier or 1]
+			if tierData then
+				campfireTierLabel.Text = tierData.name
+			end
+		end
+
+		if eventType == "Extinguished" then
+			CampfireFrame.BackgroundColor3 = Color3.fromRGB(50, 10, 10)
+			campfireIcon.Text = "💀"
+			ShowNotification("THE CAMPFIRE HAS GONE OUT!", Color3.fromRGB(255, 0, 0))
+		elseif eventType == "Relit" then
+			CampfireFrame.BackgroundColor3 = Color3.fromRGB(40, 20, 0)
+			campfireIcon.Text = "🔥"
+		end
+	end)
+end
+
+-- Stalker alerts
+local StalkerAlertRemote = Remotes:FindFirstChild("StalkerAlert")
+if StalkerAlertRemote then
+	StalkerAlertRemote.OnClientEvent:Connect(function(eventType, data)
+		if eventType == "Spawned" then
+			StalkerFrame.Visible = true
+			if data then  -- data = isHungry
+				stalkerLabel.Text = "THE STALKER IS HUNGRY TONIGHT..."
+				stalkerLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+				StalkerFrame.BackgroundColor3 = Color3.fromRGB(80, 0, 0)
+			else
+				stalkerLabel.Text = "The Stalker is hunting..."
+				stalkerLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+				StalkerFrame.BackgroundColor3 = Color3.fromRGB(60, 0, 0)
+			end
+		elseif eventType == "Despawned" or eventType == "Fleeing" then
+			StalkerFrame.Visible = false
+		elseif eventType == "Stunned" then
+			stalkerLabel.Text = "The Stalker is stunned! (" .. math.ceil(data or 3) .. "s)"
+			stalkerLabel.TextColor3 = Color3.fromRGB(200, 200, 100)
+		elseif eventType == "Attack" then
+			ShowNotification("The Stalker attacks!", Color3.fromRGB(255, 0, 0))
+		end
+	end)
+end
+
+-- Rescue updates
+local RescueUpdateRemote = Remotes:FindFirstChild("RescueUpdate")
+if RescueUpdateRemote then
+	RescueUpdateRemote.OnClientEvent:Connect(function(eventType, data)
+		if eventType == "Rescued" and type(data) == "table" then
+			rescueLabel.Text = "Missing: " .. data.rescued .. "/" .. data.totalMissing .. " rescued"
+			if data.rescued >= data.totalMissing then
+				rescueLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+				rescueLabel.Text = "All rescued! +" .. data.dayMultiplierBonus .. " day multiplier"
+			end
+		end
+	end)
+end
+
+-- Night event
+local NightEventStartedRemote = Remotes:FindFirstChild("NightEventStarted")
+local NightEventEndedRemote = Remotes:FindFirstChild("NightEventEnded")
+if NightEventStartedRemote then
+	NightEventStartedRemote.OnClientEvent:Connect(function(eventType)
+		EventFrame.Visible = true
+		local eventNames = {
+			CultistRaid = "CULTIST RAID",
+			MeteorShower = "METEOR SHOWER",
+			FrogInvasion = "FROG INVASION",
+			AlienVisit = "ALIEN VISIT",
+			BloodMoon = "BLOOD MOON",
+			ThunderStorm = "THUNDERSTORM",
+		}
+		eventLabel.Text = eventNames[eventType] or eventType
+	end)
+end
+if NightEventEndedRemote then
+	NightEventEndedRemote.OnClientEvent:Connect(function()
+		EventFrame.Visible = false
+	end)
+end
+
 print("[UIController] HUD Initialized")

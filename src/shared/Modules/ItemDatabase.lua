@@ -1100,6 +1100,188 @@ ItemDatabase.BonusLoot = {
 	},
 }
 
+------------------------------------------------------------------------
+-- Resource / Crafting Materials
+------------------------------------------------------------------------
+
+-- Wood (from tree chopping)
+ItemDatabase.Items.wood = {
+	name = "Wood",
+	category = Cat.BuildingMaterial,
+	tier = Tier.Common,
+	description = "Raw logs from felled trees. The backbone of crafting.",
+	stackable = true,
+	maxStack = 50,
+	weight = 2,
+}
+
+-- Scrap (from grinding junk)
+ItemDatabase.Items.scrap = {
+	name = "Scrap",
+	category = Cat.BuildingMaterial,
+	tier = Tier.Common,
+	description = "Processed metal scraps. Used in most crafting recipes.",
+	stackable = true,
+	maxStack = 50,
+	weight = 1,
+}
+
+-- Bolts (from grinding, used in advanced recipes)
+ItemDatabase.Items.bolts = {
+	name = "Bolts",
+	category = Cat.BuildingMaterial,
+	tier = Tier.Uncommon,
+	description = "Precision metal bolts. Required for advanced crafting.",
+	stackable = true,
+	maxStack = 30,
+	weight = 1,
+}
+
+-- Cultist Gem (rare drop from Cultist Raids / Stronghold)
+ItemDatabase.Items.cultist_gem = {
+	name = "Cultist Gem",
+	category = Cat.BuildingMaterial,
+	tier = Tier.Rare,
+	description = "A pulsing dark gem taken from cultists. Needed for Tier 4+ crafting.",
+	stackable = true,
+	maxStack = 5,
+	weight = 1,
+}
+
+-- Forest Gem (ultra-rare, from combining fragments)
+ItemDatabase.Items.forest_gem = {
+	name = "Gem of the Forest",
+	category = Cat.BuildingMaterial,
+	tier = Tier.Epic,
+	description = "A legendary gem that hums with the forest's power. Required for Tier 5 crafting.",
+	stackable = true,
+	maxStack = 3,
+	weight = 1,
+}
+
+-- Forest Gem Fragment
+ItemDatabase.Items.forest_gem_fragment = {
+	name = "Forest Gem Fragment",
+	category = Cat.BuildingMaterial,
+	tier = Tier.Rare,
+	description = "A shard of the Forest Gem. Combine 4 to create a full gem.",
+	stackable = true,
+	maxStack = 10,
+	weight = 1,
+}
+
+-- Junk items (for grinding into scrap)
+ItemDatabase.Items.broken_fan = {
+	name = "Broken Fan",
+	category = Cat.BuildingMaterial,
+	tier = Tier.Common,
+	description = "A busted electric fan. Grind for scrap.",
+	stackable = true,
+	maxStack = 5,
+	weight = 3,
+	grindable = true,
+	scrapYield = 3,
+}
+
+ItemDatabase.Items.broken_radio = {
+	name = "Broken Radio",
+	category = Cat.BuildingMaterial,
+	tier = Tier.Common,
+	description = "Old radio that no longer works. Grind for scrap.",
+	stackable = true,
+	maxStack = 5,
+	weight = 2,
+	grindable = true,
+	scrapYield = 2,
+}
+
+ItemDatabase.Items.old_tire = {
+	name = "Old Tire",
+	category = Cat.BuildingMaterial,
+	tier = Tier.Common,
+	description = "Flat rubber tire. Grind for scrap.",
+	stackable = true,
+	maxStack = 3,
+	weight = 4,
+	grindable = true,
+	scrapYield = 2,
+}
+
+ItemDatabase.Items.metal_chair = {
+	name = "Metal Chair",
+	category = Cat.BuildingMaterial,
+	tier = Tier.Common,
+	description = "Bent metal folding chair. Good scrap source.",
+	stackable = true,
+	maxStack = 3,
+	weight = 4,
+	grindable = true,
+	scrapYield = 4,
+}
+
+ItemDatabase.Items.broken_microwave = {
+	name = "Broken Microwave",
+	category = Cat.BuildingMaterial,
+	tier = Tier.Uncommon,
+	description = "Dead microwave with useful components inside.",
+	stackable = true,
+	maxStack = 2,
+	weight = 5,
+	grindable = true,
+	scrapYield = 5,
+}
+
+------------------------------------------------------------------------
+-- Sacks (backpack upgrades)
+------------------------------------------------------------------------
+ItemDatabase.Items.good_sack = {
+	name = "Good Sack",
+	category = Cat.Backpack,
+	tier = Tier.Uncommon,
+	description = "A sturdy bag. Holds up to 15 items.",
+	stackable = false,
+	maxStack = 1,
+	weight = 2,
+	sackSlots = 15,
+}
+
+ItemDatabase.Items.infernal_sack = {
+	name = "Infernal Sack",
+	category = Cat.Backpack,
+	tier = Tier.Rare,
+	description = "A heat-radiating sack that slowly cooks raw food stored inside. Holds 20 items.",
+	stackable = false,
+	maxStack = 1,
+	weight = 3,
+	sackSlots = 20,
+	cooksFood = true,
+}
+
+ItemDatabase.Items.giant_sack = {
+	name = "Giant Sack",
+	category = Cat.Backpack,
+	tier = Tier.Epic,
+	description = "An enormous bag for the serious scavenger. Holds 25 items.",
+	stackable = false,
+	maxStack = 1,
+	weight = 4,
+	sackSlots = 25,
+}
+
+------------------------------------------------------------------------
+-- Campfire Fuel
+------------------------------------------------------------------------
+ItemDatabase.Items.campfire_wood = {
+	name = "Campfire Wood",
+	category = Cat.Fuel,
+	tier = Tier.Common,
+	description = "Dry wood to keep the campfire burning. Essential for survival.",
+	stackable = true,
+	maxStack = 20,
+	weight = 2,
+	campfireFuel = 15,
+}
+
 -- Helper: get item data by ID
 function ItemDatabase.GetItem(itemId: string)
 	return ItemDatabase.Items[itemId]

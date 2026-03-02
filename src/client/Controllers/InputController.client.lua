@@ -275,4 +275,70 @@ if UserInputService.TouchEnabled then
 	sprintButton.MouseButton1Up:Connect(StopSprint)
 end
 
+------------------------------------------------------------------------
+-- Tree Chopping (click on trees tagged "Tree")
+------------------------------------------------------------------------
+local ChopTreeRemote = Remotes:FindFirstChild("ChopTree")
+local CollectionService = game:GetService("CollectionService")
+local Mouse = Player:GetMouse()
+
+local lastChopTime = 0
+local CHOP_COOLDOWN = Config.Gathering and Config.Gathering.TreeChopTime or 2
+
+Mouse.Button1Down:Connect(function()
+	if not ChopTreeRemote then return end
+	if tick() - lastChopTime < CHOP_COOLDOWN then return end
+
+	local target = Mouse.Target
+	if not target then return end
+
+	-- Check if target or any ancestor is a tree
+	local isTree = CollectionService:HasTag(target, "Tree")
+	if not isTree then
+		local parent = target.Parent
+		while parent and parent ~= workspace do
+			if CollectionService:HasTag(parent, "Tree") then
+				target = parent
+				isTree = true
+				break
+			end
+			parent = parent.Parent
+		end
+	end
+
+	if isTree then
+		lastChopTime = tick()
+		ChopTreeRemote:FireServer(target)
+	end
+end)
+
+------------------------------------------------------------------------
+-- Flashlight Stun (F key to stun The Stalker)
+------------------------------------------------------------------------
+local FlashlightStunRemote = Remotes:FindFirstChild("FlashlightStun")
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+
+	if input.KeyCode == Enum.KeyCode.F and FlashlightStunRemote then
+		FlashlightStunRemote:FireServer()
+	end
+end)
+
+------------------------------------------------------------------------
+-- Campfire Refuel (R key when near campfire with fuel in selected slot)
+------------------------------------------------------------------------
+local RefuelCampfireRemote = Remotes:FindFirstChild("RefuelCampfire")
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+
+	if input.KeyCode == Enum.KeyCode.R and RefuelCampfireRemote then
+		local selected = GetSelectedSlot()
+		if selected > 0 then
+			RefuelCampfireRemote:FireServer(selected)
+		end
+	end
+end)
+
 print("[InputController] Initialized")
