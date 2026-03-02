@@ -1,12 +1,21 @@
 --[[
 	InputController.client.lua
-	Handles player input: sprinting, interaction, weapon use, inventory.
+	Handles player input: 99 Nights-style hotbar selection, combat,
+	sprint, item use/drop, and scroll-wheel cycling.
+
+	Controls (matching 99 Nights in the Forest):
+	  [1-5+]        Select hotbar slot
+	  Scroll Wheel  Cycle hotbar slots
+	  Left Click    Use selected item (eat food / use consumable)
+	                Attack with equipped weapon (if clicking enemy)
+	  Backspace     Drop the selected item
+	  Shift         Sprint (hold)
+	  E             Interact (Roblox ProximityPrompt)
 ]]
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ContextActionService = game:GetService("ContextActionService")
 
 local Player = Players.LocalPlayer
 local Character = Player.Character or Player.CharacterAdded:Wait()
@@ -15,18 +24,13 @@ local Humanoid = Character:WaitForChild("Humanoid")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Modules = Shared:WaitForChild("Modules")
 local Config = require(Modules.Config)
+local Enums = require(Modules.Enums)
+local ItemDatabase = require(Modules.ItemDatabase)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local UseItem = Remotes:WaitForChild("UseItem")
 local DropItem = Remotes:WaitForChild("DropItem")
 local PickupItem = Remotes:WaitForChild("PickupItem")
-local CookRequest = Remotes:WaitForChild("CookRequest")
-local FortifyRequest = Remotes:WaitForChild("FortifyRequest")
-local RefuelRequest = Remotes:WaitForChild("RefuelRequest")
-local ReviveRequest = Remotes:WaitForChild("ReviveRequest")
-local InteractRequest = Remotes:WaitForChild("InteractRequest")
-local UpdateHUD = Remotes:WaitForChild("UpdateHUD")
-
 local EquipItem = Remotes:WaitForChild("EquipItem")
 
 local CombatRemotes = ReplicatedStorage:WaitForChild("CombatRemotes")
@@ -34,11 +38,28 @@ local MeleeAttack = CombatRemotes:WaitForChild("MeleeAttack")
 local RangedAttack = CombatRemotes:WaitForChild("RangedAttack")
 
 ------------------------------------------------------------------------
+-- HUD communication (via BindableFunction / BindableEvent in PurgeHUD)
+------------------------------------------------------------------------
+local HUD = Player.PlayerGui:WaitForChild("PurgeHUD")
+local GetHotbarState = HUD:WaitForChild("GetHotbarState")
+local HotbarAction = HUD:WaitForChild("HotbarAction")
+
+local function GetSelectedSlot(): number
+	return GetHotbarState:Invoke("GetSelectedSlot") or 0
+end
+
+local function GetInventory()
+	return GetHotbarState:Invoke("GetInventory") or {}
+end
+
+local function GetMaxSlots(): number
+	return GetHotbarState:Invoke("GetMaxSlots") or 5
+end
+
+------------------------------------------------------------------------
 -- State
 ------------------------------------------------------------------------
 local IsSprinting = false
-local SelectedSlot = 1
-local InventoryOpen = false
 local IsAttacking = false
 
 ------------------------------------------------------------------------
@@ -69,15 +90,7 @@ local function StopSprint()
 end
 
 ------------------------------------------------------------------------
--- Hotbar Selection (1-9 keys + 0)
-------------------------------------------------------------------------
-local function SelectHotbarSlot(slotNumber: number)
-	SelectedSlot = slotNumber
-	UpdateHUD.OnClientEvent:Connect(function() end)  -- handled by UI
-end
-
-------------------------------------------------------------------------
--- Attack (mouse click)
+-- Attack (left click on enemy)
 ------------------------------------------------------------------------
 local function OnAttack()
 	if IsAttacking then return end
@@ -97,8 +110,6 @@ local function OnAttack()
 	if result and result.Instance then
 		local targetModel = result.Instance:FindFirstAncestorOfClass("Model")
 		if targetModel and targetModel:FindFirstChildOfClass("Humanoid") then
-			-- Determine melee or ranged based on equipped weapon
-			-- For now, send melee attack
 			MeleeAttack:FireServer(targetModel)
 		end
 	end
@@ -106,6 +117,72 @@ local function OnAttack()
 	task.delay(0.5, function()
 		IsAttacking = false
 	end)
+end
+
+------------------------------------------------------------------------
+-- Left Click Handler — 99 Nights style
+-- If clicking on an enemy model → attack
+-- If not on enemy → use selected hotbar item (eat/consume)
+------------------------------------------------------------------------
+local function OnLeftClick()
+	-- First check if clicking on an enemy
+	local mouse = Player:GetMouse()
+	local camera = workspace.CurrentCamera
+
+	local ray = camera:ScreenPointToRay(mouse.X, mouse.Y)
+	local raycastParams = RaycastParams.new()
+	raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+	raycastParams.FilterDescendantsInstances = { Character }
+
+	local result = workspace:Raycast(ray.Origin, ray.Direction * 100, raycastParams)
+
+	if result and result.Instance then
+		local targetModel = result.Instance:FindFirstAncestorOfClass("Model")
+		if targetModel and targetModel:FindFirstChildOfClass("Humanoid") then
+			-- Clicking on an enemy → attack
+			OnAttack()
+			return
+		end
+	end
+
+	-- Not clicking on an enemy → use selected hotbar item
+	local slot = GetSelectedSlot()
+	if slot > 0 then
+		local inventory = GetInventory()
+		local item = inventory[slot]
+		if item then
+			local itemData = ItemDatabase.GetItem(item.itemId)
+			if itemData then
+				-- Don't "use" weapons via click (they attack via the raycast above)
+				if itemData.category ~= Enums.ItemCategory.Weapon then
+					HotbarAction:Fire("UseSelected")
+				end
+			end
+		end
+	end
+end
+
+------------------------------------------------------------------------
+-- Scroll Wheel — cycle hotbar slots
+------------------------------------------------------------------------
+local function OnScrollWheel(direction)
+	local maxSlots = GetMaxSlots()
+	local current = GetSelectedSlot()
+
+	if current == 0 then
+		-- Nothing selected, start at 1
+		HotbarAction:Fire("SelectSlot", 1)
+		return
+	end
+
+	local newSlot = current + direction
+	if newSlot < 1 then
+		newSlot = maxSlots
+	elseif newSlot > maxSlots then
+		newSlot = 1
+	end
+
+	HotbarAction:Fire("SelectSlot", newSlot)
 end
 
 ------------------------------------------------------------------------
@@ -133,39 +210,37 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		[Enum.KeyCode.Zero] = 10,
 	}
 	if keyToSlot[input.KeyCode] then
-		SelectHotbarSlot(keyToSlot[input.KeyCode])
+		local slot = keyToSlot[input.KeyCode]
+		local maxSlots = GetMaxSlots()
+		if slot <= maxSlots then
+			HotbarAction:Fire("SelectSlot", slot)
+		end
 	end
 
-	-- Use item (F key)
-	if input.KeyCode == Enum.KeyCode.F then
-		UseItem:FireServer(SelectedSlot)
+	-- Backspace — Drop selected item (99 Nights style)
+	if input.KeyCode == Enum.KeyCode.Backspace then
+		HotbarAction:Fire("DropSelected")
 	end
 
-	-- Drop item (G key)
-	if input.KeyCode == Enum.KeyCode.G then
-		DropItem:FireServer(SelectedSlot)
-	end
-
-	-- Toggle inventory (Tab / I key)
-	if input.KeyCode == Enum.KeyCode.Tab or input.KeyCode == Enum.KeyCode.I then
-		InventoryOpen = not InventoryOpen
-		-- TODO: Toggle full inventory UI visibility
-	end
-
-	-- Interact (E key) — proximity-based
-	if input.KeyCode == Enum.KeyCode.E then
-		-- ProximityPrompts handle this natively in Roblox
-		-- This is a fallback for custom interactions
-	end
-
-	-- Equip weapon from hotbar (Q to quick-equip)
-	if input.KeyCode == Enum.KeyCode.Q then
-		EquipItem:FireServer(SelectedSlot)
-	end
-
-	-- Mouse click to attack
+	-- Left click — attack enemy or use selected item
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		OnAttack()
+		OnLeftClick()
+	end
+
+	-- Scroll wheel
+	if input.UserInputType == Enum.UserInputType.MouseWheel then
+		-- Negative = scroll down (next slot), Positive = scroll up (prev slot)
+		-- Note: scroll direction is in input.Position.Z
+	end
+end)
+
+-- Scroll wheel via InputChanged (more reliable for mouse wheel)
+UserInputService.InputChanged:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+
+	if input.UserInputType == Enum.UserInputType.MouseWheel then
+		local direction = input.Position.Z > 0 and -1 or 1
+		OnScrollWheel(direction)
 	end
 end)
 
@@ -190,7 +265,7 @@ if UserInputService.TouchEnabled then
 	sprintButton.BackgroundTransparency = 0.4
 	sprintButton.Font = Enum.Font.GothamBold
 	sprintButton.TextScaled = true
-	sprintButton.Parent = Player.PlayerGui:WaitForChild("PurgeHUD")
+	sprintButton.Parent = HUD
 
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 40)

@@ -395,15 +395,15 @@ local function ShowNotification(text: string, color: Color3?)
 end
 
 ------------------------------------------------------------------------
--- Inventory Display (bottom-center) — Clickable slots with actions
+-- Inventory Display (bottom-center) — 99 Nights style hotbar
 ------------------------------------------------------------------------
 local currentMaxSlots = Config.Player.MaxInventorySlots  -- starts at 5
 local currentInventory = {}  -- cached copy from server
-local selectedSlot = nil     -- currently highlighted slot index
+local selectedSlot = 0       -- currently highlighted slot index (0 = none)
 
 local InventoryFrame = CreateFrame({
 	Name = "InventoryBar",
-	Size = UDim2.new(0, 600, 0, 75),
+	Size = UDim2.new(0, 600, 0, 80),
 	Position = UDim2.new(0.5, 0, 1, -10),
 	AnchorPoint = Vector2.new(0.5, 1),
 	BackgroundTransparency = 0.5,
@@ -421,9 +421,42 @@ local BackpackLabel = CreateLabel({
 	Parent = InventoryFrame,
 })
 
+-- Controls hint label
+local ControlsHint = CreateLabel({
+	Name = "ControlsHint",
+	Size = UDim2.new(1, 0, 0, 12),
+	Position = UDim2.new(0, 0, 1, 1),
+	Text = "[1-5] Select  |  [Click] Use  |  [Backspace] Drop",
+	TextColor3 = Color3.fromRGB(140, 140, 140),
+	Font = Enum.Font.Gotham,
+	Parent = InventoryFrame,
+})
+
+-- Selected item tooltip (shows above hotbar when slot is selected)
+local ItemTooltip = CreateFrame({
+	Name = "ItemTooltip",
+	Size = UDim2.new(0, 200, 0, 24),
+	Position = UDim2.new(0.5, 0, 1, -100),
+	AnchorPoint = Vector2.new(0.5, 1),
+	BackgroundColor3 = Color3.fromRGB(20, 20, 25),
+	BackgroundTransparency = 0.2,
+	Corner = 6,
+})
+ItemTooltip.Visible = false
+
+local TooltipLabel = CreateLabel({
+	Name = "TooltipText",
+	Size = UDim2.new(1, -8, 1, 0),
+	Position = UDim2.new(0, 4, 0, 0),
+	Text = "",
+	TextColor3 = Color3.new(1, 1, 1),
+	Font = Enum.Font.GothamBold,
+	Parent = ItemTooltip,
+})
+
 local InventorySlotContainer = CreateFrame({
 	Name = "SlotContainer",
-	Size = UDim2.new(1, -8, 0, 52),
+	Size = UDim2.new(1, -8, 0, 56),
 	Position = UDim2.new(0, 4, 0, 17),
 	BackgroundTransparency = 1,
 	Parent = InventoryFrame,
@@ -439,97 +472,27 @@ InventoryLayout.Parent = InventorySlotContainer
 local InventorySlots = {}
 
 ------------------------------------------------------------------------
--- Action Panel (appears above selected slot)
-------------------------------------------------------------------------
-local ActionPanel = CreateFrame({
-	Name = "ActionPanel",
-	Size = UDim2.new(0, 180, 0, 36),
-	Position = UDim2.new(0.5, 0, 1, -95),
-	AnchorPoint = Vector2.new(0.5, 1),
-	BackgroundColor3 = Color3.fromRGB(25, 25, 30),
-	BackgroundTransparency = 0.15,
-	Corner = 8,
-})
-ActionPanel.Visible = false
-
-local ActionLayout = Instance.new("UIListLayout")
-ActionLayout.FillDirection = Enum.FillDirection.Horizontal
-ActionLayout.SortOrder = Enum.SortOrder.LayoutOrder
-ActionLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-ActionLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-ActionLayout.Padding = UDim.new(0, 4)
-ActionLayout.Parent = ActionPanel
-
--- Item name label above action buttons
-local ActionItemLabel = CreateLabel({
-	Name = "ItemName",
-	Size = UDim2.new(1, 0, 0, 16),
-	Position = UDim2.new(0, 0, 0, -18),
-	Text = "",
-	TextColor3 = Color3.fromRGB(255, 255, 255),
-	Font = Enum.Font.GothamBold,
-	Parent = ActionPanel,
-})
-
-local function CreateActionButton(name, text, color)
-	local btn = Instance.new("TextButton")
-	btn.Name = name
-	btn.Size = UDim2.new(0, 52, 0, 26)
-	btn.BackgroundColor3 = color
-	btn.BackgroundTransparency = 0.2
-	btn.Text = text
-	btn.TextColor3 = Color3.new(1, 1, 1)
-	btn.TextScaled = true
-	btn.Font = Enum.Font.GothamBold
-	btn.BorderSizePixel = 0
-	btn.AutoButtonColor = true
-	btn.Visible = false
-	btn.Parent = ActionPanel
-
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 6)
-	corner.Parent = btn
-
-	return btn
-end
-
-local EatButton = CreateActionButton("EatBtn", "Eat", Color3.fromRGB(60, 160, 60))
-local EquipButton = CreateActionButton("EquipBtn", "Equip", Color3.fromRGB(50, 120, 200))
-local UseButton = CreateActionButton("UseBtn", "Use", Color3.fromRGB(140, 100, 200))
-local DropButton = CreateActionButton("DropBtn", "Drop", Color3.fromRGB(180, 60, 60))
-
-------------------------------------------------------------------------
--- Slot selection / deselection
+-- Slot selection / deselection (99 Nights style)
 ------------------------------------------------------------------------
 local function DeselectSlot()
-	if selectedSlot and InventorySlots[selectedSlot] then
+	if selectedSlot > 0 and InventorySlots[selectedSlot] then
 		local slotData = InventorySlots[selectedSlot]
 		slotData.stroke.Color = Color3.fromRGB(60, 60, 60)
+		slotData.stroke.Thickness = 2
 		slotData.stroke.Transparency = 0.6
+		slotData.numberLabel.TextColor3 = Color3.fromRGB(120, 120, 120)
 	end
-	selectedSlot = nil
-	ActionPanel.Visible = false
-	EatButton.Visible = false
-	EquipButton.Visible = false
-	UseButton.Visible = false
-	DropButton.Visible = false
+	selectedSlot = 0
+	ItemTooltip.Visible = false
 end
 
 local function SelectSlot(index)
-	-- If clicking same slot, deselect
-	if selectedSlot == index then
-		DeselectSlot()
-		return
-	end
+	if index == selectedSlot then return end -- already selected
 
 	-- Deselect previous
 	DeselectSlot()
 
-	local item = currentInventory[index]
-	if not item then return end
-
-	local itemData = ItemDatabase.GetItem(item.itemId)
-	if not itemData then return end
+	if index < 1 or index > currentMaxSlots then return end
 
 	selectedSlot = index
 
@@ -537,78 +500,40 @@ local function SelectSlot(index)
 	local slotData = InventorySlots[index]
 	if slotData then
 		slotData.stroke.Color = Color3.fromRGB(255, 220, 80)
+		slotData.stroke.Thickness = 3
 		slotData.stroke.Transparency = 0
+		slotData.numberLabel.TextColor3 = Color3.fromRGB(255, 220, 80)
 	end
 
-	-- Show item name
-	local tierColor = Enums.TierColor[itemData.tier] or Color3.new(1, 1, 1)
-	ActionItemLabel.Text = itemData.name
-	ActionItemLabel.TextColor3 = tierColor
+	-- Show tooltip with item name
+	local item = currentInventory[index]
+	if item then
+		local itemData = ItemDatabase.GetItem(item.itemId)
+		if itemData then
+			local tierColor = Enums.TierColor[itemData.tier] or Color3.new(1, 1, 1)
+			TooltipLabel.Text = itemData.name
+			TooltipLabel.TextColor3 = tierColor
+			ItemTooltip.Visible = true
 
-	-- Show relevant action buttons based on item category
-	local category = itemData.category
-
-	if category == Enums.ItemCategory.Food and itemData.hungerRestore and itemData.hungerRestore > 0 then
-		EatButton.Visible = true
+			-- Auto-equip if it's a weapon
+			if itemData.category == Enums.ItemCategory.Weapon then
+				EquipItem:FireServer(index)
+			end
+		end
+	else
+		ItemTooltip.Visible = false
 	end
-
-	if category == Enums.ItemCategory.Weapon then
-		EquipButton.Visible = true
-	end
-
-	-- "Use" for recipes, energy drinks, etc (non-food, non-weapon usable items)
-	if category == Enums.ItemCategory.Recipe
-		or item.itemId == "energy_drink" then
-		UseButton.Visible = true
-	end
-
-	-- Drop is always available
-	DropButton.Visible = true
-
-	-- Position action panel above the selected slot
-	ActionPanel.Visible = true
 end
 
 ------------------------------------------------------------------------
--- Action button handlers
-------------------------------------------------------------------------
-EatButton.MouseButton1Click:Connect(function()
-	if not selectedSlot then return end
-	local idx = selectedSlot
-	DeselectSlot()
-	UseItemRemote:FireServer(idx)
-end)
-
-EquipButton.MouseButton1Click:Connect(function()
-	if not selectedSlot then return end
-	local idx = selectedSlot
-	DeselectSlot()
-	EquipItem:FireServer(idx)
-end)
-
-UseButton.MouseButton1Click:Connect(function()
-	if not selectedSlot then return end
-	local idx = selectedSlot
-	DeselectSlot()
-	UseItemRemote:FireServer(idx)
-end)
-
-DropButton.MouseButton1Click:Connect(function()
-	if not selectedSlot then return end
-	local idx = selectedSlot
-	DeselectSlot()
-	DropItemRemote:FireServer(idx)
-end)
-
-------------------------------------------------------------------------
--- Create inventory slots (clickable TextButtons)
+-- Create inventory slots (clickable, with number key labels)
 ------------------------------------------------------------------------
 local function CreateInventorySlot(index)
-	local slotWidth = math.min(50, math.floor(580 / currentMaxSlots) - 4)
+	local slotWidth = math.min(55, math.floor(580 / currentMaxSlots) - 4)
 
 	local slot = Instance.new("TextButton")
 	slot.Name = "Slot_" .. index
-	slot.Size = UDim2.new(0, slotWidth, 0, 50)
+	slot.Size = UDim2.new(0, slotWidth, 0, 54)
 	slot.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 	slot.BackgroundTransparency = 0.3
 	slot.Text = ""
@@ -627,10 +552,22 @@ local function CreateInventorySlot(index)
 	stroke.Transparency = 0.6
 	stroke.Parent = slot
 
+	-- Slot number label (top-left corner)
+	local numberLabel = CreateLabel({
+		Name = "SlotNumber",
+		Size = UDim2.new(0, 14, 0, 14),
+		Position = UDim2.new(0, 2, 0, 1),
+		Text = index <= 10 and tostring(index % 10) or "",
+		TextColor3 = Color3.fromRGB(120, 120, 120),
+		TextScaled = true,
+		Font = Enum.Font.GothamBold,
+		Parent = slot,
+	})
+
 	local nameLabel = CreateLabel({
 		Name = "ItemName",
-		Size = UDim2.new(1, -2, 0.6, 0),
-		Position = UDim2.new(0, 1, 0, 0),
+		Size = UDim2.new(1, -2, 0.5, 0),
+		Position = UDim2.new(0, 1, 0, 14),
 		Text = "",
 		TextColor3 = Color3.new(1, 1, 1),
 		Font = Enum.Font.Gotham,
@@ -639,23 +576,36 @@ local function CreateInventorySlot(index)
 
 	local countLabel = CreateLabel({
 		Name = "Count",
-		Size = UDim2.new(1, -2, 0.3, 0),
-		Position = UDim2.new(0, 1, 0.7, 0),
+		Size = UDim2.new(1, -2, 0.25, 0),
+		Position = UDim2.new(0, 1, 0.75, 0),
 		Text = "",
 		TextColor3 = Color3.fromRGB(200, 200, 200),
 		Font = Enum.Font.Gotham,
 		Parent = slot,
 	})
 
-	-- Click handler
+	-- Click handler: select this slot
 	slot.MouseButton1Click:Connect(function()
-		SelectSlot(index)
+		if selectedSlot == index then
+			-- Double-click / re-click: use the item
+			local item = currentInventory[index]
+			if item then
+				local itemData = ItemDatabase.GetItem(item.itemId)
+				if itemData and itemData.category ~= Enums.ItemCategory.Weapon then
+					-- Use/eat non-weapon items on click
+					UseItemRemote:FireServer(index)
+				end
+			end
+		else
+			SelectSlot(index)
+		end
 	end)
 
 	return {
 		frame = slot,
 		nameLabel = nameLabel,
 		countLabel = countLabel,
+		numberLabel = numberLabel,
 		stroke = stroke,
 	}
 end
@@ -712,11 +662,64 @@ local function UpdateInventoryDisplay(inventory)
 		end
 	end
 
-	-- If selected slot is now empty, deselect
-	if selectedSlot and not currentInventory[selectedSlot] then
-		DeselectSlot()
+	-- Update tooltip if selected slot changed
+	if selectedSlot > 0 then
+		local item = currentInventory[selectedSlot]
+		if item then
+			local itemData = ItemDatabase.GetItem(item.itemId)
+			if itemData then
+				TooltipLabel.Text = itemData.name
+				TooltipLabel.TextColor3 = Enums.TierColor[itemData.tier] or Color3.new(1, 1, 1)
+				ItemTooltip.Visible = true
+			end
+		else
+			ItemTooltip.Visible = false
+		end
 	end
 end
+
+------------------------------------------------------------------------
+-- Expose inventory state for InputController via BindableFunction
+------------------------------------------------------------------------
+local GetHotbarState = Instance.new("BindableFunction")
+GetHotbarState.Name = "GetHotbarState"
+GetHotbarState.Parent = HUD
+GetHotbarState.OnInvoke = function(action)
+	if action == "GetSelectedSlot" then
+		return selectedSlot
+	elseif action == "GetInventory" then
+		return currentInventory
+	elseif action == "GetMaxSlots" then
+		return currentMaxSlots
+	end
+	return nil
+end
+
+-- BindableEvent for InputController to trigger slot selection
+local HotbarAction = Instance.new("BindableEvent")
+HotbarAction.Name = "HotbarAction"
+HotbarAction.Parent = HUD
+HotbarAction.Event:Connect(function(action, value)
+	if action == "SelectSlot" then
+		SelectSlot(value)
+	elseif action == "DeselectSlot" then
+		DeselectSlot()
+	elseif action == "UseSelected" then
+		if selectedSlot > 0 and currentInventory[selectedSlot] then
+			UseItemRemote:FireServer(selectedSlot)
+		end
+	elseif action == "DropSelected" then
+		if selectedSlot > 0 and currentInventory[selectedSlot] then
+			local idx = selectedSlot
+			DeselectSlot()
+			DropItemRemote:FireServer(idx)
+		end
+	elseif action == "EquipSelected" then
+		if selectedSlot > 0 and currentInventory[selectedSlot] then
+			EquipItem:FireServer(selectedSlot)
+		end
+	end
+end)
 
 ------------------------------------------------------------------------
 -- Currency Display (top-right)
